@@ -1,0 +1,15 @@
+{
+  "name": "bsc-exclusive-poms",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "BSC Exclusive Purchase Order Management System (POMS)",
+  "private": true,
+  "main": "server.cjs",
+  "scripts": {
+    "start": "node server.cjs",
+    "backend": "npm start --prefix backend",
+    "frontend": "npm run dev --prefix frontend",
+    "build": "npm run build --prefix frontend",
+    "test": "npm test --prefix backend"
+  }
+}

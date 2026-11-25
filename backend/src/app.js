@@ -158,15 +158,15 @@ import { fileURLToPath } from 'node:url';
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const candidateDirs = [
-  path.join(currentDir, '..', 'dist'),
   path.join(currentDir, '..', 'public'),
-  path.join(currentDir, '..', '..', 'frontend', 'dist'),
-  path.join(currentDir, '..', '..', 'dist'),
+  path.join(currentDir, '..', 'dist'),
   path.join(currentDir, '..', '..', 'public'),
-  path.resolve(process.cwd(), 'dist'),
+  path.join(currentDir, '..', '..', 'dist'),
+  path.join(currentDir, '..', '..', 'frontend', 'dist'),
   path.resolve(process.cwd(), 'public'),
-  path.resolve(process.cwd(), 'backend', 'dist'),
+  path.resolve(process.cwd(), 'dist'),
   path.resolve(process.cwd(), 'backend', 'public'),
+  path.resolve(process.cwd(), 'backend', 'dist'),
   path.resolve(process.cwd(), 'frontend', 'dist'),
   path.resolve(process.cwd(), '..', 'frontend', 'dist'),
 ];
@@ -188,8 +188,17 @@ app.get('*', (req, res, next) => {
   if (/\.[a-zA-Z0-9]{2,8}$/.test(req.path)) {
     return next();
   }
+  // 1. Check all registered directories
   for (const dir of registeredDirs) {
     const file = path.join(dir, 'index.html');
+    if (fs.existsSync(file)) {
+      return res.sendFile(file);
+    }
+  }
+  // 2. Dynamic check across all candidate directories
+  for (const dir of candidateDirs) {
+    const resolved = path.resolve(dir);
+    const file = path.join(resolved, 'index.html');
     if (fs.existsSync(file)) {
       return res.sendFile(file);
     }
