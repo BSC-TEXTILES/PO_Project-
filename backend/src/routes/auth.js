@@ -2,7 +2,7 @@ import { Router } from 'express';
 import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { query, pool, newId } from '../config/db.js';
-import { authenticate, generateSessionToken, hashToken, loadUser, loadUserByEmail } from '../middleware/auth.js';
+import { authenticate, generateSessionToken, hashToken, loadUser, loadUserByEmail, REFRESH_TOKEN_MINUTES } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/security.js';
 import { validate } from '../middleware/validate.js';
 import { ah, badRequest, tooManyRequests } from '../utils/httpError.js';
@@ -224,6 +224,7 @@ r.post('/refresh', ah(async (req, res) => {
   const { rows } = await query(
     `SELECT user_id, tab_id FROM user_sessions
       WHERE token_hash = $1 AND logout_at IS NULL
+        AND login_at > (UTC_TIMESTAMP(6) - INTERVAL ${REFRESH_TOKEN_MINUTES} MINUTE)
       LIMIT 1`,
     [hashed]
   );

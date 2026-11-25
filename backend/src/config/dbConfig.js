@@ -19,12 +19,14 @@ dotenv.config({ path: path.resolve(__dirname, '../../../.env.production'), quiet
 export function resolveDbConfig(env = process.env) {
   let cfg;
   if (env.DB_HOST || env.DB_NAME || env.DB_USER) {
+    const rawUser = env.DB_USER || '';
+    const rawDb = env.DB_NAME || '';
     cfg = {
       host: env.DB_HOST || 'localhost',
       port: parseInt(env.DB_PORT || '3306', 10),
-      user: env.DB_USER,
+      user: /^u\d+_/i.test(rawUser) ? rawUser.toLowerCase() : rawUser,
       password: env.DB_PASSWORD ?? '',
-      database: env.DB_NAME,
+      database: /^u\d+_/i.test(rawDb) ? rawDb.toLowerCase() : rawDb,
     };
   } else if (env.DATABASE_URL) {
     let u;

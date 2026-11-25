@@ -11,12 +11,31 @@ export function hashToken(token) {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
 
-// Sessions older than SESSION_MAX_AGE_HOURS (default 7 days, matching REFRESH_EXPIRES_IN)
-// are rejected even if the user never logged out.
-const SESSION_MAX_AGE_HOURS = Math.max(1, parseInt(process.env.SESSION_MAX_AGE_HOURS || '168', 10));
+export function parseDurationMinutes(str, defaultMinutes = 15) {
+  if (!str) return defaultMinutes;
+  const s = String(str).trim().toLowerCase();
+  const m = s.match(/^(\d+)\s*(m|min|h|hr|d|day)?s?$/);
+  if (!m) return defaultMinutes;
+  const val = parseInt(m[1], 10);
+  const unit = m[2] || 'm';
+  if (unit === 'h' || unit === 'hr') return val * 60;
+  if (unit === 'd' || unit === 'day') return val * 1440;
+  return val;
+}
+
+// Access token lifetime: default 15 minutes (configurable via JWT_EXPIRES_IN e.g. 15M)
+export const ACCESS_TOKEN_MINUTES = parseDurationMinutes(process.env.JWT_EXPIRES_IN, 15);
+
+// Refresh token / session lifetime: default 60 minutes (configurable via JWT_REFRESH_EXPIRES_IN e.g. 1H)
+export const REFRESH_TOKEN_MINUTES = parseDurationMinutes(
+  process.env.JWT_REFRESH_EXPIRES_IN || (process.env.SESSION_MAX_AGE_HOURS ? `${process.env.SESSION_MAX_AGE_HOURS}h` : null),
+  60
+);
+
+// An active access token must not be logged out and must have activity within ACCESS_TOKEN_MINUTES
 const ACTIVE_SESSION_SQL = `SELECT user_id FROM user_sessions
    WHERE token_hash = $1 AND logout_at IS NULL
-     AND login_at > (UTC_TIMESTAMP(6) - INTERVAL ${SESSION_MAX_AGE_HOURS} HOUR)
+     AND last_seen_at > (UTC_TIMESTAMP(6) - INTERVAL ${ACCESS_TOKEN_MINUTES} MINUTE)
    LIMIT 1`;
 
 export async function verifyToken(token) {
