@@ -100,17 +100,29 @@ export async function ensureMigrations() {
 
   let conn;
   let lastErr = null;
+  const candidateCreds = [
+    { user: cfg.user, db: cfg.database },
+    { user: cfg.user.replace(/_1$/i, ''), db: cfg.database.replace(/_1$/i, '') },
+    { user: `${cfg.user}_1`, db: `${cfg.database}_1` },
+  ].filter((c, i, a) => a.findIndex((x) => x.user.toLowerCase() === c.user.toLowerCase() && x.db.toLowerCase() === c.db.toLowerCase()) === i);
+
   for (const host of candidateHosts) {
-    try {
-      conn = await mysql.createConnection({
-        host, port: cfg.port, user: cfg.user, password: cfg.password,
-        database: cfg.database, ssl: cfg.ssl, timezone: 'Z', multipleStatements: false,
-        connectTimeout: 5000,
-      });
-      break;
-    } catch (err) {
-      lastErr = err;
+    for (const cred of candidateCreds) {
+      try {
+        conn = await mysql.createConnection({
+          host, port: cfg.port, user: cred.user, password: cfg.password,
+          database: cred.db, ssl: cfg.ssl, timezone: 'Z', multipleStatements: false,
+          connectTimeout: 5000,
+        });
+        cfg.host = host;
+        cfg.user = cred.user;
+        cfg.database = cred.db;
+        break;
+      } catch (err) {
+        lastErr = err;
+      }
     }
+    if (conn) break;
   }
 
   if (!conn) {

@@ -44,13 +44,13 @@ function typeCast(field, next) {
 const cfg = resolveDbConfig();
 export const dbName = cfg.database;
 
-function createPool(host) {
+function createPool(host = cfg.host, user = cfg.user, database = cfg.database) {
   const p = mysql.createPool({
     host,
     port: cfg.port,
-    user: cfg.user,
+    user,
     password: cfg.password,
-    database: cfg.database,
+    database,
     ssl: cfg.ssl,
     charset: 'utf8mb4_0900_ai_ci',
     timezone: 'Z',
@@ -64,7 +64,7 @@ function createPool(host) {
     maxIdle: cfg.connectionLimit,
     idleTimeout: 60_000,
     queueLimit: 0,
-    connectTimeout: 10_000,
+    connectTimeout: 5_000,
     enableKeepAlive: true,
     keepAliveInitialDelay: 10_000,
     multipleStatements: false,
@@ -77,6 +77,49 @@ function createPool(host) {
 }
 
 let rawPool = createPool(cfg.host);
+
+const CONNECTION_ERRORS = new Set([
+  'ER_ACCESS_DENIED_ERROR', 'ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND',
+  'EAI_AGAIN', 'PROTOCOL_CONNECTION_LOST', 'ER_BAD_DB_ERROR',
+]);
+
+let fallbackPromise = null;
+async function tryFallback() {
+  if (fallbackPromise) return fallbackPromise;
+  fallbackPromise = (async () => {
+    // When deployed on Hostinger, MySQL is local: prioritize localhost and 127.0.0.1 over remote domain
+    const candidateHosts = [cfg.host, 'localhost', '127.0.0.1'].filter((h, i, a) => Boolean(h) && a.indexOf(h) === i);
+    const candidateCreds = [
+      { user: cfg.user, db: cfg.database },
+      { user: cfg.user.replace(/_1$/i, ''), db: cfg.database.replace(/_1$/i, '') },
+      { user: `${cfg.user}_1`, db: `${cfg.database}_1` },
+    ].filter((c, i, a) => a.findIndex((x) => x.user.toLowerCase() === c.user.toLowerCase() && x.db.toLowerCase() === c.db.toLowerCase()) === i);
+
+    for (const host of candidateHosts) {
+      for (const cred of candidateCreds) {
+        if (host === cfg.host && cred.user === cfg.user && cred.db === cfg.database) continue;
+        try {
+          const testPool = createPool(host, cred.user, cred.db);
+          const [r] = await testPool.query('SELECT VERSION() AS version, DATABASE() AS db');
+          await rawPool.end().catch(() => {});
+          rawPool = testPool;
+          cfg.host = host;
+          cfg.user = cred.user;
+          cfg.database = cred.db;
+          process.env.DB_HOST = host;
+          process.env.DB_USER = cred.user;
+          process.env.DB_NAME = cred.db;
+          console.log(`✓ Resilient MySQL switch: connected to ${cred.user}@${host}/${cred.db} (${r[0]?.version || 'ok'})`);
+          return true;
+        } catch (_) {}
+      }
+    }
+    return false;
+  })();
+  const result = await fallbackPromise;
+  fallbackPromise = null;
+  return result;
+}
 
 // ---------------------------------------------------------------- params ---
 const ISO_TS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})$/;
@@ -158,6 +201,12 @@ export async function query(sql, params = []) {
   try {
     return await run(rawPool, sql, params);
   } catch (e) {
+    if (CONNECTION_ERRORS.has(e.code)) {
+      const recovered = await tryFallback();
+      if (recovered) {
+        return await run(rawPool, sql, params);
+      }
+    }
     if (TRANSIENT.has(e.code) && /^\s*(SELECT|SHOW|WITH)\b/i.test(sql)) {
       await new Promise((r) => setTimeout(r, 250));
       return run(rawPool, sql, params);
@@ -176,7 +225,21 @@ function wrapConnection(conn) {
 
 /** Runs fn(tx) inside START TRANSACTION / COMMIT; rolls back on any error. */
 export async function withTransaction(fn) {
-  const conn = await rawPool.getConnection();
+  let conn;
+  try {
+    conn = await rawPool.getConnection();
+  } catch (e) {
+    if (CONNECTION_ERRORS.has(e.code)) {
+      const recovered = await tryFallback();
+      if (recovered) {
+        conn = await rawPool.getConnection();
+      } else {
+        throw e;
+      }
+    } else {
+      throw e;
+    }
+  }
   const tx = wrapConnection(conn);
   try {
     await conn.beginTransaction();
@@ -256,19 +319,11 @@ export async function ping() {
     const { rows: [r] } = await query('SELECT VERSION() AS version, DATABASE() AS db');
     return { ms: Date.now() - started, version: r.version, database: r.db };
   } catch (e) {
-    if (e.code === 'ER_ACCESS_DENIED_ERROR' && cfg.host !== 'localhost' && cfg.host !== '127.0.0.1') {
-      for (const fallbackHost of ['localhost', '127.0.0.1']) {
-        const testPool = createPool(fallbackHost);
-        try {
-          const { rows: [r] } = await run(testPool, 'SELECT VERSION() AS version, DATABASE() AS db', []);
-          await rawPool.end().catch(() => {});
-          rawPool = testPool;
-          process.env.DB_HOST = fallbackHost;
-          console.log(`✓ MySQL ${cfg.host} rejected remote IP — switched to ${fallbackHost} seamlessly`);
-          return { ms: Date.now() - started, version: r.version, database: r.db };
-        } catch {
-          await testPool.end().catch(() => {});
-        }
+    if (CONNECTION_ERRORS.has(e.code)) {
+      const recovered = await tryFallback();
+      if (recovered) {
+        const { rows: [r] } = await run(rawPool, 'SELECT VERSION() AS version, DATABASE() AS db', []);
+        return { ms: Date.now() - started, version: r.version, database: r.db };
       }
     }
     throw e;
