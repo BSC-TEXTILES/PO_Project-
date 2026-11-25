@@ -97,7 +97,7 @@ r.post('/login', rateLimit(10, 60 * 1000), validate({ body: loginSchema }), ah(a
   const tabId = req.headers['x-tab-id'] || 'default';
   await query('DELETE FROM user_sessions WHERE user_id = $1 AND tab_id = $2', [user.id, tabId]).catch(() => {});
   await query(
-    'INSERT INTO user_sessions (user_id, token_hash, tab_id, ip_address, user_agent) VALUES ($1, $2, $3, $4, $5)', 
+    'INSERT INTO user_sessions (id, user_id, token_hash, tab_id, ip_address, user_agent) VALUES ($1, $2, $3, $4, $5, $6)', 
     [newId(), user.id, hashed, tabId, req.ip || '127.0.0.1', req.headers['user-agent'] || '']
   );
 
@@ -159,7 +159,7 @@ r.post('/login/verify-mfa', rateLimit(5, 60 * 1000), validate({ body: verifyMfaS
   const tabId = req.headers['x-tab-id'] || 'default';
   await query('DELETE FROM user_sessions WHERE user_id = $1 AND tab_id = $2', [user.id, tabId]).catch(() => {});
   await query(
-    'INSERT INTO user_sessions (user_id, token_hash, tab_id, ip_address, user_agent) VALUES ($1, $2, $3, $4, $5)', 
+    'INSERT INTO user_sessions (id, user_id, token_hash, tab_id, ip_address, user_agent) VALUES ($1, $2, $3, $4, $5, $6)', 
     [newId(), user.id, hashed, tabId, req.ip || '127.0.0.1', req.headers['user-agent'] || '']
   );
 
