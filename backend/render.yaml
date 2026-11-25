@@ -1,0 +1,44 @@
+# Render blueprint — deploy the POMS backend as a Web Service.
+# In Render: New → Blueprint → point it at this repository (or configure manually).
+services:
+  - type: web
+    name: poms-api
+    runtime: node
+    plan: starter
+    rootDir: backend
+    buildCommand: npm ci || npm install
+    preDeployCommand: npm run db:migrate   # applies pending schema migrations (additive only)
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # MySQL 8.0.19+ (managed MySQL or your own server). Set the secrets in the dashboard.
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: "3306"
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_NAME
+        sync: false
+      - key: DB_CONNECTION_LIMIT
+        value: "10"
+      - key: DB_SSL
+        value: "true"        # managed MySQL normally requires TLS
+      - key: APP_UTC_OFFSET
+        value: "+05:30"
+      - key: CLERK_SECRET_KEY
+        sync: false          # set in dashboard: Clerk → API Keys → Secret Key
+      - key: CORS_ORIGIN
+        sync: false          # e.g. https://poms.vercel.app
+      - key: STORAGE_DRIVER
+        value: supabase
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_BUCKET
+        value: poms-uploads

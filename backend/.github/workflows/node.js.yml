@@ -1,0 +1,68 @@
+name: Node.js CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [20.x, 22.x]
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ci_root_only
+          MYSQL_DATABASE: bsc_textiles
+          MYSQL_USER: poms_ci
+          MYSQL_PASSWORD: ci_app_only
+        ports: [ "3306:3306" ]
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci_root_only"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_USER: poms_ci
+      DB_PASSWORD: ci_app_only
+      DB_NAME: bsc_textiles
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+
+    - name: Allow audit-log triggers for the CI account
+      run: mysql -h 127.0.0.1 -uroot -pci_root_only -e "SET GLOBAL log_bin_trust_function_creators = 1; GRANT TRIGGER ON bsc_textiles.* TO 'poms_ci'@'%';"
+
+    - name: Verify Backend (unit tests, MySQL migrations, API suites)
+      run: |
+        cd backend
+        npm ci --no-audit
+        npm run check
+        npm test
+        npm run db:migrate
+        node scripts/setup-db.mjs
+        node scripts/e2e.mjs
+        node tests/crud.e2e.mjs
+        node tests/api-sweep.mjs
+        node tests/security.blackbox.mjs
+        npm run db:integrity
+
+    - name: Verify and Build Frontend
+      run: |
+        cd frontend
+        npm ci --no-audit
+        npm run build

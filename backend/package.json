@@ -1,0 +1,41 @@
+{
+  "name": "poms-backend",
+  "version": "1.0.0",
+  "description": "Purchase Order Management System - Express + MySQL API (FRS v2.0)",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch-path=src src/server.js",
+    "db:migrate": "node scripts/db-migrate.mjs",
+    "db:status": "node scripts/db-migrate.mjs --status",
+    "db:check": "node scripts/check-db.mjs",
+    "db:backup": "node scripts/db-backup.mjs",
+    "db:integrity": "node scripts/db-integrity.mjs",
+    "seed": "node scripts/seed.js",
+    "e2e": "node scripts/e2e.mjs",
+    "check": "node --check src/server.js && node --check src/app.js",
+    "test": "node --test tests/unit.test.mjs tests/db.test.mjs"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "multer": "^2.3.0",
+    "mysql2": "^3.24.6",
+    "pdf-parse": "^2.4.5",
+    "qrcode": "^1.5.4",
+    "ws": "^8.21.3",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+    "zod": "^4.6.2"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2"
+  },
+  "overrides": {
+    "qs": "^6.17.1"
+  }
+}

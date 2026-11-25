@@ -1,0 +1,1833 @@
+import { useEffect, useState, useMemo } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import api, { errMessage } from '../api.js';
+import { useAuth, useCart } from '../auth.jsx';
+import PhoneInput from '../components/PhoneInput.jsx';
+import { Field, Money } from '../components/DataTable.jsx';
+import Modal from '../components/Modal.jsx';
+import Icon from '../components/Icon.jsx';
+
+const WIZARD_STEPS = [
+  { id: 'collection', label: 'Collection', desc: 'Main category' },
+  { id: 'type', label: 'Product Type', desc: 'Section / style' },
+  { id: 'product', label: 'Product', desc: 'Choose item' },
+  { id: 'brand', label: 'Brand', desc: 'Manufacturer' },
+  { id: 'size', label: 'Sizes', desc: 'Size range' },
+  { id: 'color', label: 'Colors', desc: 'Color variants' },
+  { id: 'quantity', label: 'Quantity', desc: 'Pieces per variant' },
+  { id: 'pricing', label: 'Pricing', desc: 'Cost & margins' },
+  { id: 'review', label: 'Review & Submit', desc: 'Finalize order' },
+];
+
+function StepIcon({ stepId, isActive }) {
+  const iconColor = isActive ? '#ffffff' : '#64748b';
+  const size = 15;
+  switch (stepId) {
+    case 'collection':
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="9" cy="21" r="1" />
+          <circle cx="20" cy="21" r="1" />
+          <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+        </svg>
+      );
+    case 'type':
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z" />
+        </svg>
+      );
+    case 'product':
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+          <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+          <line x1="12" y1="22.08" x2="12" y2="12" />
+        </svg>
+      );
+    case 'brand':
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+        </svg>
+      );
+    case 'size':
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21.3 8.7 8.7 21.3a2.12 2.12 0 0 1-3 0L2.7 18.3a2.12 2.12 0 0 1 0-3L15.3 2.7a2.12 2.12 0 0 1 3 0l3 3a2.12 2.12 0 0 1 0 3z" />
+          <line x1="7.5" y1="10.5" x2="9" y2="12" />
+          <line x1="10.5" y1="7.5" x2="12" y2="9" />
+          <line x1="13.5" y1="4.5" x2="15" y2="6" />
+        </svg>
+      );
+    case 'color':
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="13.5" cy="6.5" r=".7" fill="currentColor" />
+          <circle cx="17.5" cy="10.5" r=".7" fill="currentColor" />
+          <circle cx="8.5" cy="7.5" r=".7" fill="currentColor" />
+          <circle cx="6.5" cy="12.5" r=".7" fill="currentColor" />
+          <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.563-2.512 5.563-5.563C22 6.5 17.5 2 12 2z" />
+        </svg>
+      );
+    case 'quantity':
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="4" y1="9" x2="20" y2="9" />
+          <line x1="4" y1="15" x2="20" y2="15" />
+          <line x1="10" y1="3" x2="8" y2="21" />
+          <line x1="16" y1="3" x2="14" y2="21" />
+        </svg>
+      );
+    case 'pricing':
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+          <line x1="7" y1="7" x2="7.01" y2="7" />
+        </svg>
+      );
+    case 'review':
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M9 11l3 3L22 4" />
+          <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+}
+
+function MenShirtIcon({ size = 48, color = 'currentColor' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z" />
+      <path d="m9 2 3 4 3-4" />
+      <line x1="12" y1="6" x2="12" y2="12" />
+    </svg>
+  );
+}
+
+function WomenDressIcon({ size = 48, color = 'currentColor' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 3 L10 6 C11 7 13 7 14 6 L16 3 L19 6 L16 9 L17 13 L20 21 L4 21 L7 13 L8 9 L5 6 Z" />
+      <path d="M10 6 C11 7.5 13 7.5 14 6" />
+      <line x1="7" y1="13" x2="17" y2="13" />
+    </svg>
+  );
+}
+
+function KidsShirtIcon({ size = 48, color = 'currentColor' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M19 5.5 15.5 4a3 3 0 0 1-7 0L5 5.5A1.5 1.5 0 0 0 4 7l.4 2.5a1 1 0 0 0 1 .8H7v8.5a1.5 1.5 0 0 0 1.5 1.5h7a1.5 1.5 0 0 0 1.5-1.5V10.3h1.6a1 1 0 0 0 1-.8l.4-2.5a1.5 1.5 0 0 0-1-1.5z" />
+      <polygon points="12,9 12.8,11.2 15,11.2 13.2,12.5 13.9,14.6 12,13.3 10.1,14.6 10.8,12.5 9,11.2 11.2,11.2" fill="none" stroke={color} strokeWidth="1.2" />
+    </svg>
+  );
+}
+
+function HomeFurnishingsIcon({ size = 48, color = 'currentColor' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 10.5 12 3l9 7.5" />
+      <path d="M5 9v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9" />
+      <path d="M9 21v-6a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v6" />
+      <line x1="18" y1="5" x2="18" y2="8" />
+    </svg>
+  );
+}
+
+function renderCollectionIcon(code, isSelected) {
+  const color = isSelected ? '#0f4c2e' : '#334155';
+  switch (code) {
+    case 'MEN':
+      return <MenShirtIcon size={46} color={color} />;
+    case 'WOMEN':
+      return <WomenDressIcon size={46} color={color} />;
+    case 'KIDS':
+      return <KidsShirtIcon size={46} color={color} />;
+    case 'HOME':
+      return <HomeFurnishingsIcon size={46} color={color} />;
+    default:
+      return <MenShirtIcon size={46} color={color} />;
+  }
+}
+
+const STANDARD_COLLECTIONS = [
+  { code: 'MEN', name: "Men's Collection", desc: "Shirts, Trousers, Ethnic, Innerwear & Footwear" },
+  { code: 'WOMEN', name: "Women's Collection", desc: "Sarees, Kurtis, Western Wear & Fabrics" },
+  { code: 'KIDS', name: "Kids Collection", desc: "Boys, Girls, Infants & Toddlers" },
+  { code: 'HOME', name: "Home Furnishings", desc: "Bed Linen, Curtains, Towels & Accessories" },
+];
+
+const STANDARD_COLORS = [
+  { name: 'White', hex: '#FFFFFF' },
+  { name: 'Black', hex: '#1C1C1C' },
+  { name: 'Navy Blue', hex: '#0B2545' },
+  { name: 'Grey', hex: '#64748B' },
+  { name: 'Sky Blue', hex: '#38BDF8' },
+  { name: 'Red', hex: '#DC2626' },
+  { name: 'Maroon', hex: '#881337' },
+  { name: 'Dark Green', hex: '#166534' },
+  { name: 'Olive', hex: '#65A30D' },
+  { name: 'Beige', hex: '#D6D3D1' },
+  { name: 'Brown', hex: '#78350F' },
+  { name: 'Yellow', hex: '#FACC15' },
+];
+
+const STANDARD_SIZES_BY_CATEGORY = {
+  apparel_alpha: ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL', '5XL', '6XL'],
+  apparel_numeric: ['28', '30', '32', '34', '36', '38', '40', '42', '44', '46', '48', '50', '52', '54', '56'],
+  footwear: ['UK 6', 'UK 7', 'UK 8', 'UK 9', 'UK 10', 'UK 11', 'UK 12'],
+  kids: ['0-3M', '3-6M', '6-12M', '1-2Y', '2-3Y', '3-4Y', '4-5Y', '6-7Y', '8-9Y', '10-11Y', '12-14Y'],
+  home: ['Single', 'Double', 'Queen', 'King', 'Standard', 'Custom'],
+};
+
+const round2 = (v) => Math.round((Number(v) + Number.EPSILON) * 100) / 100;
+
+export default function POCreate() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { hasPermission, user } = useAuth();
+  const { addItem: addToCart } = useCart();
+  const editId = searchParams.get('edit');
+
+  const [step, setStep] = useState(0);
+  const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  // Master records
+  const [departments, setDepartments] = useState([]);
+  const [sections, setSections] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
+  const [brands, setBrands] = useState([]);
+  const [colours, setColours] = useState([]);
+  const [divisions, setDivisions] = useState([]);
+  const [gstPercent, setGstPercent] = useState(18);
+
+  // Current wizard line selection
+  const [selectedCollection, setSelectedCollection] = useState(null); // department
+  const [selectedSection, setSelectedSection] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [productSearch, setProductSearch] = useState('');
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [selectedBrand, setSelectedBrand] = useState(null);
+  const [selectedSizes, setSelectedSizes] = useState([]);
+  const [selectedColors, setSelectedColors] = useState([]);
+  const [quantities, setQuantities] = useState({}); // key: `${color}__${size}` -> number
+  const [quickFillQty, setQuickFillQty] = useState('10');
+
+  // Commercials for current line
+  const [purchasePrice, setPurchasePrice] = useState('850');
+  const [marginPercent, setMarginPercent] = useState('25');
+
+  // Persistent cart lines
+  const [cartLines, setCartLines] = useState([]);
+
+  // Final Order Header
+  const [orderHeader, setOrderHeader] = useState({
+    supplierId: '',
+    divisionId: '',
+    expectedDeliveryDate: '',
+    remarks: '',
+    taxScheme: 'GST_INTRA',
+  });
+
+  // Inline modals
+  const [inlineModal, setInlineModal] = useState(null); // 'brand' | 'color' | 'supplier' | 'product'
+  const [brandForm, setBrandForm] = useState({ brandName: '', brandCode: '', manufacturer: '' });
+  const [colorForm, setColorForm] = useState({ name: '' });
+  const [supplierForm, setSupplierForm] = useState({ companyName: '', code: '', contactPerson: '', mobile: '', gstin: '' });
+  const [customProductForm, setCustomProductForm] = useState({ name: '', sku: '', hsn: '6205', purchasePrice: '800' });
+
+  // Initial master data fetch
+  useEffect(() => {
+    Promise.all([
+      api.get('/departments'),
+      api.get('/sections?status=active'),
+      api.get('/suppliers?status=active'),
+      api.get('/brands'),
+      api.get('/colours'),
+      api.get('/divisions'),
+      api.get('/settings'),
+    ])
+      .then(([d, s, sup, b, col, div, set]) => {
+        setDepartments(d.data.data || []);
+        setSections(s.data.data || []);
+        setSuppliers(sup.data.data || []);
+        setBrands(b.data.data || []);
+        setColours(col.data.data || []);
+        setDivisions(div.data.data || []);
+        const gst = set.data.data?.find((x) => x.key === 'gst_percent');
+        if (gst) setGstPercent(Number(gst.value));
+
+        if (div.data.data?.length) {
+          setOrderHeader((h) => ({ ...h, divisionId: h.divisionId || div.data.data[0].id }));
+        }
+        if (sup.data.data?.length) {
+          setOrderHeader((h) => ({ ...h, supplierId: h.supplierId || sup.data.data[0].id }));
+        }
+      })
+      .catch((e) => setError(errMessage(e)));
+  }, []);
+
+  // Fetch products when section changes
+  useEffect(() => {
+    if (!selectedSection) {
+      setProducts([]);
+      return;
+    }
+    api.get('/products', { params: { sectionId: selectedSection.id, status: 'active', pageSize: 500 } })
+      .then((r) => setProducts(r.data.data || []))
+      .catch(() => {});
+  }, [selectedSection]);
+
+  // If editing an existing PO
+  useEffect(() => {
+    if (!editId) return;
+    api.get(`/purchase-orders/${editId}`).then(({ data: { data: po } }) => {
+      setOrderHeader({
+        supplierId: po.supplier_id,
+        divisionId: po.division_id,
+        expectedDeliveryDate: po.expected_delivery_date || '',
+        remarks: po.remarks || '',
+        taxScheme: po.tax_scheme || 'GST_INTRA',
+      });
+      // Convert existing lines to cartLines
+      const restored = (po.items || []).map((i) => {
+        const lineQty = Number(i.total_quantity) || 0;
+        const pp = Number(i.purchase_price) || 0;
+        const mp = Number(i.margin_percent) || 0;
+        const sp = Number(i.final_value_per_unit || (pp * (1 + mp / 100)));
+        return {
+          id: i.id || Math.random().toString(),
+          product: { id: i.product_id, name: i.product_name, sku: i.sku },
+          brand: { id: i.brand_id, brand_name: i.brand_name },
+          section: { id: po.section_id, name: po.section_name },
+          sizes: (i.quantities || []).map((q) => q.sizeLabel),
+          colors: [i.colour_name || 'Standard'],
+          quantities: Object.fromEntries((i.quantities || []).map((q) => [`${i.colour_name || 'Standard'}__${q.sizeLabel}`, q.quantity])),
+          purchasePrice: pp,
+          marginPercent: mp,
+          sellingPrice: sp,
+          profitPerPiece: round2(sp - pp),
+          totalQty: lineQty,
+          totalPurchase: round2(pp * lineQty),
+          totalSelling: round2(sp * lineQty),
+          totalProfit: round2((sp - pp) * lineQty),
+        };
+      });
+      setCartLines(restored);
+      setStep(8); // Go straight to Review & Submit
+    }).catch((e) => setError(errMessage(e)));
+  }, [editId]);
+
+  // Filter sections by collection/department
+  const filteredSections = useMemo(() => {
+    if (!selectedCollection) return [];
+    return sections.filter((s) => {
+      if (selectedCollection.id && s.department_id === selectedCollection.id) return true;
+      const cCode = (selectedCollection.code || '').toUpperCase();
+      return (s.code || '').toUpperCase().startsWith(cCode);
+    });
+  }, [selectedCollection, sections]);
+
+  // Filter products by search term
+  const filteredProducts = useMemo(() => {
+    if (!productSearch) return products;
+    const term = productSearch.toLowerCase();
+    return products.filter((p) =>
+      (p.name && p.name.toLowerCase().includes(term)) ||
+      (p.sku && p.sku.toLowerCase().includes(term)) ||
+      (p.brand_name && p.brand_name.toLowerCase().includes(term))
+    );
+  }, [products, productSearch]);
+
+  // Sizes available for selected section
+  const availableSizes = useMemo(() => {
+    if (!selectedSection) return STANDARD_SIZES_BY_CATEGORY.apparel_alpha;
+    const code = (selectedSection.code || '').toLowerCase();
+    const name = (selectedSection.name || '').toLowerCase();
+    if (code.includes('footwear') || name.includes('footwear')) {
+      return STANDARD_SIZES_BY_CATEGORY.footwear;
+    }
+    if (code.includes('kid') || name.includes('kid') || code.includes('infant')) {
+      return STANDARD_SIZES_BY_CATEGORY.kids;
+    }
+    if (code.includes('home') || name.includes('home') || code.includes('linen') || name.includes('towel')) {
+      return STANDARD_SIZES_BY_CATEGORY.home;
+    }
+    if (code.includes('trouser') || code.includes('jean') || name.includes('trouser') || name.includes('jean')) {
+      return STANDARD_SIZES_BY_CATEGORY.apparel_numeric;
+    }
+    return STANDARD_SIZES_BY_CATEGORY.apparel_alpha;
+  }, [selectedSection]);
+
+  // Calculations for current working line
+  const currentLineCalc = useMemo(() => {
+    const pp = Math.max(0, parseFloat(purchasePrice) || 0);
+    const mp = Math.max(0, parseFloat(marginPercent) || 0);
+    const sellingPrice = round2(pp * (1 + mp / 100));
+    const profitPerPiece = round2(sellingPrice - pp);
+
+    let totalQty = 0;
+    Object.values(quantities).forEach((q) => {
+      const n = parseInt(q, 10);
+      if (n > 0) totalQty += n;
+    });
+
+    const totalPurchase = round2(pp * totalQty);
+    const totalSelling = round2(sellingPrice * totalQty);
+    const totalProfit = round2(profitPerPiece * totalQty);
+
+    return {
+      purchasePrice: pp,
+      marginPercent: mp,
+      sellingPrice,
+      profitPerPiece,
+      totalQty,
+      totalPurchase,
+      totalSelling,
+      totalProfit,
+    };
+  }, [purchasePrice, marginPercent, quantities]);
+
+  // Overall Cart Totals
+  const cartSummary = useMemo(() => {
+    const lines = [...cartLines];
+    // If currently configuring an item and it has quantity > 0
+    let totalPieces = lines.reduce((acc, l) => acc + (l.totalQty || 0), 0);
+    let totalPurchaseVal = lines.reduce((acc, l) => acc + (l.totalPurchase || 0), 0);
+    let totalSellingVal = lines.reduce((acc, l) => acc + (l.totalSelling || 0), 0);
+    let totalProfit = lines.reduce((acc, l) => acc + (l.totalProfit || 0), 0);
+
+    const overallMargin = totalPurchaseVal > 0 ? round2((totalProfit / totalPurchaseVal) * 100) : 0;
+    const tax = round2((totalPurchaseVal * gstPercent) / 100);
+    const grandTotal = round2(totalPurchaseVal + tax);
+
+    return {
+      itemCount: lines.length,
+      totalPieces,
+      totalPurchaseVal,
+      totalSellingVal,
+      totalProfit,
+      overallMargin,
+      tax,
+      grandTotal,
+    };
+  }, [cartLines, gstPercent]);
+
+  // Step Validation
+  function canAdvance(targetStep) {
+    setError('');
+    if (targetStep > 0 && !selectedCollection) {
+      return false;
+    }
+    if (targetStep > 1 && !selectedSection) {
+      return false;
+    }
+    if (targetStep > 2 && !selectedProduct) {
+      return false;
+    }
+    if (targetStep > 3 && !selectedBrand) {
+      return false;
+    }
+    if (targetStep > 4 && (!selectedSizes || !selectedSizes.length)) {
+      return false;
+    }
+    if (targetStep > 5 && (!selectedColors || !selectedColors.length)) {
+      return false;
+    }
+    if (targetStep > 6 && currentLineCalc.totalQty <= 0) {
+      setError('Please enter a quantity of at least 1 piece.');
+      return false;
+    }
+    if (targetStep > 7 && currentLineCalc.purchasePrice <= 0) {
+      setError('Please enter a valid purchase value.');
+      return false;
+    }
+    return true;
+  }
+
+  function goToStep(s) {
+    if (s > step && !canAdvance(s)) return;
+    setError('');
+    setStep(s);
+  }
+
+  // Quick fill quantities
+  function applyQuickFill() {
+    const qty = parseInt(quickFillQty, 10);
+    if (isNaN(qty) || qty < 0) return;
+    const next = {};
+    selectedColors.forEach((c) => {
+      selectedSizes.forEach((s) => {
+        next[`${c}__${s}`] = qty;
+      });
+    });
+    setQuantities(next);
+  }
+
+  // Toggle size selection
+  function toggleSize(sz) {
+    setError('');
+    if (selectedSizes.includes(sz)) {
+      setSelectedSizes(selectedSizes.filter((s) => s !== sz));
+    } else {
+      setSelectedSizes([...selectedSizes, sz]);
+    }
+  }
+
+  // Toggle color selection
+  function toggleColor(colName) {
+    setError('');
+    if (selectedColors.includes(colName)) {
+      setSelectedColors(selectedColors.filter((c) => c !== colName));
+    } else {
+      setSelectedColors([...selectedColors, colName]);
+    }
+  }
+
+  // Add line to cart and reset line-level inputs
+  function commitCurrentLineToCart(stayOrReview = 'stay') {
+    if (!canAdvance(7)) return false;
+
+    const newLine = {
+      id: Math.random().toString(36).substring(2, 9),
+      product: selectedProduct,
+      brand: selectedBrand,
+      section: selectedSection,
+      collection: selectedCollection,
+      sizes: [...selectedSizes],
+      colors: [...selectedColors],
+      quantities: { ...quantities },
+      purchasePrice: currentLineCalc.purchasePrice,
+      marginPercent: currentLineCalc.marginPercent,
+      sellingPrice: currentLineCalc.sellingPrice,
+      profitPerPiece: currentLineCalc.profitPerPiece,
+      totalQty: currentLineCalc.totalQty,
+      totalPurchase: currentLineCalc.totalPurchase,
+      totalSelling: currentLineCalc.totalSelling,
+      totalProfit: currentLineCalc.totalProfit,
+    };
+
+    setCartLines((prev) => [...prev, newLine]);
+    setSuccessMsg(`✓ Added "${selectedProduct.name}" (${currentLineCalc.totalQty} pcs) to Purchase Order!`);
+    setTimeout(() => setSuccessMsg(''), 3500);
+
+    if (stayOrReview === 'review') {
+      setStep(8);
+    } else {
+      // Clear line selections to add another product
+      setSelectedProduct(null);
+      setSelectedBrand(null);
+      setSelectedSizes([]);
+      setSelectedColors([]);
+      setQuantities({});
+      setStep(2); // Go back to Product Selection
+    }
+    return true;
+  }
+
+  function removeCartLine(lineId) {
+    setCartLines(cartLines.filter((l) => l.id !== lineId));
+  }
+
+  // Inline Brand Creation
+  async function handleCreateBrand() {
+    if (!brandForm.brandName.trim()) {
+      setError('Brand name is required');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      const res = await api.post('/brands', {
+        brandName: brandForm.brandName.trim(),
+        brandCode: brandForm.brandCode.trim() || undefined,
+        manufacturer: brandForm.manufacturer.trim() || undefined,
+      });
+      const newBrand = res.data.data;
+      setBrands((prev) => [newBrand, ...prev]);
+      setSelectedBrand(newBrand);
+      setInlineModal(null);
+      setBrandForm({ brandName: '', brandCode: '', manufacturer: '' });
+      setSuccessMsg(`✓ Brand "${newBrand.brand_name}" created and selected!`);
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } catch (e) {
+      setError(errMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Inline Custom Color Creation
+  async function handleCreateColor() {
+    if (!colorForm.name.trim()) {
+      setError('Color name is required');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      const res = await api.post('/colours', { name: colorForm.name.trim() });
+      const newCol = res.data.data;
+      setColours((prev) => [...prev, newCol]);
+      if (!selectedColors.includes(newCol.name)) {
+        setSelectedColors([...selectedColors, newCol.name]);
+      }
+      setInlineModal(null);
+      setColorForm({ name: '' });
+      setSuccessMsg(`✓ Color "${newCol.name}" added and selected!`);
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } catch (e) {
+      setError(errMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Inline Custom Product Creation
+  async function handleCreateCustomProduct() {
+    if (!customProductForm.name.trim()) {
+      setError('Product name is required');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      const sku = customProductForm.sku.trim() || `SKU-${Date.now().toString(36).slice(-5).toUpperCase()}`;
+      const res = await api.post('/products', {
+        name: customProductForm.name.trim(),
+        sku,
+        hsnSac: customProductForm.hsn.trim() || '6205',
+        sectionId: selectedSection.id,
+        brandId: selectedBrand?.id || (brands[0]?.id || null),
+        purchasePrice: parseFloat(customProductForm.purchasePrice) || 800,
+      });
+      const newP = res.data.data;
+      setProducts((prev) => [newP, ...prev]);
+      setSelectedProduct(newP);
+      if (newP.brand_id) {
+        const b = brands.find((x) => x.id === newP.brand_id);
+        if (b) setSelectedBrand(b);
+      }
+      setInlineModal(null);
+      setCustomProductForm({ name: '', sku: '', hsn: '6205', purchasePrice: '800' });
+      setSuccessMsg(`✓ Product "${newP.name}" created and selected!`);
+      setTimeout(() => setSuccessMsg(''), 3000);
+      setStep(3); // Proceed to brand
+    } catch (e) {
+      setError(errMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Inline Supplier Creation
+  async function handleCreateSupplier() {
+    if (!supplierForm.companyName.trim()) {
+      setError('Supplier company name is required');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      const code = supplierForm.code.trim() || `SUP-${Date.now().toString(36).slice(-4).toUpperCase()}`;
+      const res = await api.post('/suppliers', {
+        companyName: supplierForm.companyName.trim(),
+        code,
+        contactPerson: supplierForm.contactPerson.trim() || undefined,
+        mobile: supplierForm.mobile.trim() || undefined,
+        gstin: supplierForm.gstin.trim() || undefined,
+        divisionIds: orderHeader.divisionId ? [orderHeader.divisionId] : undefined,
+      });
+      const newSup = res.data.data;
+      setSuppliers((prev) => [...prev, newSup]);
+      setOrderHeader((h) => ({ ...h, supplierId: newSup.id }));
+      setInlineModal(null);
+      setSupplierForm({ companyName: '', code: '', contactPerson: '', mobile: '', gstin: '' });
+      setSuccessMsg(`✓ Supplier "${newSup.company_name}" created and selected!`);
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } catch (e) {
+      setError(errMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Submit Final PO
+  async function handleFinalSave(submitForApproval = false) {
+    if (!orderHeader.supplierId) {
+      setError('Please select a supplier for this purchase order.');
+      return;
+    }
+    if (!orderHeader.divisionId) {
+      setError('Please select a division for this order.');
+      return;
+    }
+
+    // Determine lines to persist: cartLines + active line if not committed
+    let finalLines = [...cartLines];
+    if (finalLines.length === 0) {
+      if (currentLineCalc.totalQty > 0) {
+        finalLines = [{
+          product: selectedProduct,
+          brand: selectedBrand,
+          section: selectedSection,
+          quantities: { ...quantities },
+          purchasePrice: currentLineCalc.purchasePrice,
+          marginPercent: currentLineCalc.marginPercent,
+          totalQty: currentLineCalc.totalQty,
+        }];
+      } else {
+        setError('Your purchase order has no items. Add at least one product.');
+        return;
+      }
+    }
+
+    setBusy(true);
+    setError('');
+    try {
+      const primarySectionId = finalLines[0]?.section?.id || selectedSection?.id || sections[0]?.id;
+      const primaryDepartmentId = selectedCollection?.id || departments[0]?.id;
+
+      // Format payload for /api/purchase-orders
+      const payload = {
+        supplierId: orderHeader.supplierId,
+        divisionId: orderHeader.divisionId,
+        departmentId: primaryDepartmentId,
+        sectionId: primarySectionId,
+        expectedDeliveryDate: orderHeader.expectedDeliveryDate || null,
+        remarks: orderHeader.remarks || undefined,
+        taxScheme: orderHeader.taxScheme || 'GST_INTRA',
+        lines: finalLines.map((l) => {
+          // Break quantities into array of { sizeLabel, quantity }
+          const qtyList = Object.entries(l.quantities || {})
+            .map(([k, v]) => {
+              const [, sLabel] = k.includes('__') ? k.split('__') : ['', k];
+              return { sizeLabel: sLabel || k, quantity: Number(v) || 0 };
+            })
+            .filter((q) => q.quantity > 0);
+
+          return {
+            productId: l.product?.id,
+            colourId: colours.find((c) => (l.colors || [])[0] === c.name)?.id || null,
+            purchasePrice: l.purchasePrice,
+            marginPercent: l.marginPercent,
+            discountType: null,
+            discountValue: 0,
+            quantities: qtyList,
+          };
+        }),
+      };
+
+      let poId = editId;
+      if (editId) {
+        await api.put(`/purchase-orders/${editId}`, payload);
+      } else {
+        const { data } = await api.post('/purchase-orders', payload);
+        poId = data.data.id;
+        addToCart(data.data);
+      }
+
+      if (submitForApproval) {
+        await api.post(`/purchase-orders/${poId}/submit`);
+      }
+
+      navigate(`/purchase-orders/${poId}`, { state: { submitted: submitForApproval } });
+    } catch (e) {
+      setError(errMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="page">
+      {/* Header */}
+      <div className="row" style={{ alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <h1 className="page-title" style={{ margin: 0 }}>
+            {editId ? 'Edit Draft Purchase Order' : 'Create Purchase Order'}
+          </h1>
+          <div style={{ width: 1, height: 20, backgroundColor: '#cbd5e1' }} />
+          <span style={{ color: '#64748b', fontSize: 13.5, fontWeight: 500 }}>Main Menu</span>
+        </div>
+        <button
+          className="btn ghost sm"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            border: '1px solid #cbd5e1',
+            borderRadius: 8,
+            color: '#475569',
+            backgroundColor: '#fff',
+            padding: '6px 14px',
+            fontWeight: 500,
+            fontSize: 13,
+          }}
+          onClick={() => navigate('/purchase-orders')}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+          Cancel & Exit
+        </button>
+      </div>
+      <p className="page-sub" style={{ margin: '0 0 16px', color: '#64748b', fontSize: 13.5 }}>
+        Progressive 9-step guided workflow for fast, error-free purchase ordering.
+      </p>
+
+      {/* Progress Stepper */}
+      <div className="po-wizard-stepper">
+        {WIZARD_STEPS.map((s, idx) => {
+          const isActive = step === idx;
+          return (
+            <div
+              key={s.id}
+              className={`po-wizard-step ${isActive ? 'active' : ''}`}
+              onClick={() => goToStep(idx)}
+            >
+              <span className="po-step-icon" style={{ display: 'flex', alignItems: 'center' }}>
+                <StepIcon stepId={s.id} isActive={isActive} />
+              </span>
+              <span className="po-step-label">{isActive ? `${idx + 1} ${s.label}` : s.label}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Informational Banner */}
+      {(() => {
+        let infoBanner = null;
+        if (step === 0 && !selectedCollection) {
+          infoBanner = { text: 'Please select a main collection first.', showIcon: false };
+        } else if (step === 1 && !selectedSection) {
+          infoBanner = { text: 'Please select a product type / category.', showIcon: true };
+        } else if (step === 2 && !selectedProduct) {
+          infoBanner = { text: 'Please choose a product.', showIcon: true };
+        } else if (step === 3 && !selectedBrand) {
+          infoBanner = { text: 'Please select a brand.', showIcon: true };
+        } else if (step === 4 && (!selectedSizes || selectedSizes.length === 0)) {
+          infoBanner = { text: 'Please select a size.', showIcon: true };
+        } else if (step === 5 && (!selectedColors || selectedColors.length === 0)) {
+          infoBanner = { text: 'Please select a color.', showIcon: true };
+        }
+
+        if (infoBanner) {
+          return (
+            <div
+              className="po-alert-banner-safe"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                backgroundColor: '#eef7f2',
+                border: '1px solid #c6e7d2',
+                color: '#0f4c2e',
+                borderRadius: 8,
+                padding: '10px 16px',
+                marginBottom: 18,
+                fontSize: 13.5,
+                fontWeight: 500,
+              }}
+            >
+              {infoBanner.showIcon && (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0f4c2e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                  <polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
+              )}
+              <span>{infoBanner.text}</span>
+            </div>
+          );
+        }
+        if (error) {
+          return <div className="alert error">{error}</div>;
+        }
+        return null;
+      })()}
+      {successMsg && <div className="alert ok">{successMsg}</div>}
+
+      {/* Two-Column Layout (Wizard on Left, Working PO Cart on Right) */}
+      <div className="po-wizard-layout">
+        {/* Left: Step Content */}
+        <div className="po-wizard-main">
+          {/* STEP 0: MAIN COLLECTION */}
+          {step === 0 && (
+            <div className="panel po-main-panel">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                <div
+                  style={{
+                    width: 30,
+                    height: 30,
+                    borderRadius: '50%',
+                    backgroundColor: '#0f4c2e',
+                    color: '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 14,
+                    fontWeight: 700,
+                    flexShrink: 0,
+                  }}
+                >
+                  1
+                </div>
+                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#0f172a' }}>
+                  What are you purchasing? Select Main Collection
+                </h3>
+              </div>
+              <p className="muted" style={{ margin: '0 0 20px 42px', fontSize: 13, color: '#64748b' }}>
+                Choose the department to begin. Unrelated categories will be filtered out automatically.
+              </p>
+
+              <div className="po-collection-grid">
+                {STANDARD_COLLECTIONS.map((col) => {
+                  const matchedDept = departments.find((d) => (d.code || '').toUpperCase() === col.code) || col;
+                  const isSelected = selectedCollection ? (selectedCollection.code === col.code || selectedCollection.id === col.id) : false;
+                  return (
+                    <div
+                      key={col.code}
+                      className={`po-collection-card ${isSelected ? 'selected' : ''}`}
+                      onClick={() => {
+                        setSelectedCollection(matchedDept);
+                        setSelectedSection(null);
+                        setSelectedProduct(null);
+                        setSelectedBrand(null);
+                        setStep(1);
+                        setError('');
+                      }}
+                    >
+                      <div className="po-collection-icon-wrap">
+                        {renderCollectionIcon(col.code, isSelected)}
+                      </div>
+                      <div className="po-collection-title">{col.name}</div>
+                      <div className="po-collection-desc">{col.desc}</div>
+                      <button
+                        type="button"
+                        className={`po-collection-btn ${isSelected ? 'selected' : ''}`}
+                      >
+                        Select Collection
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* STEP 1: PRODUCT TYPE / CATEGORY */}
+          {step === 1 && (
+            <div className="panel">
+              <div className="row" style={{ alignItems: 'center', marginBottom: 10 }}>
+                <h3 style={{ margin: 0 }}>2. Select Product Type / Category in {selectedCollection?.name}</h3>
+                <button className="btn sm ghost right" onClick={() => goToStep(0)}>
+                  &larr; Change Collection
+                </button>
+              </div>
+              <p className="muted" style={{ fontSize: 13, margin: '0 0 16px' }}>
+                Select the specific garment, item, or fabric section you want to order.
+              </p>
+
+              <div className="po-category-grid">
+                {filteredSections.map((sec) => {
+                  const isSelected = selectedSection?.id === sec.id;
+                  return (
+                    <div
+                      key={sec.id}
+                      className={`po-category-tile ${isSelected ? 'selected' : ''}`}
+                      onClick={() => {
+                        setSelectedSection(sec);
+                        setSelectedProduct(null);
+                        setSelectedBrand(null);
+                        setStep(2);
+                        setError('');
+                      }}
+                    >
+                      <div className="po-category-name">{sec.name}</div>
+                      <div className="po-category-sub">Code: {sec.code}</div>
+                    </div>
+                  );
+                })}
+                {filteredSections.length === 0 && (
+                  <div className="muted" style={{ padding: 20, textAlign: 'center', gridColumn: '1 / -1' }}>
+                    No specific sub-sections found. You can proceed with general ordering or configure sections in Masters.
+                  </div>
+                )}
+              </div>
+
+              <div className="row mt">
+                <button className="btn" onClick={() => goToStep(0)}>&larr; Back to Collection</button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 2: PRODUCT SELECTION */}
+          {step === 2 && (
+            <div className="panel">
+              <div className="row" style={{ alignItems: 'center', marginBottom: 12 }}>
+                <div>
+                  <h3 style={{ margin: 0 }}>3. Select Product in {selectedSection?.name}</h3>
+                  <div className="muted" style={{ fontSize: 12 }}>Showing active products for {selectedCollection?.name} &gt; {selectedSection?.name}</div>
+                </div>
+                <div className="right row" style={{ gap: 8 }}>
+                  <button className="btn sm" onClick={() => setInlineModal('product')}>+ Add New Product</button>
+                  <button className="btn sm ghost" onClick={() => goToStep(1)}>&larr; Change Section</button>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 14 }}>
+                <input
+                  type="text"
+                  placeholder="Search product by name, SKU, or brand..."
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1.5px solid var(--line)', fontSize: 14 }}
+                />
+              </div>
+
+              <div className="po-product-grid">
+                {filteredProducts.map((p) => {
+                  const isSelected = selectedProduct?.id === p.id;
+                  return (
+                    <div
+                      key={p.id}
+                      className={`po-product-card ${isSelected ? 'selected' : ''}`}
+                      onClick={() => {
+                        setSelectedProduct(p);
+                        if (p.purchase_price) setPurchasePrice(String(p.purchase_price));
+                        setSelectedBrand(null);
+                        setStep(3);
+                        setError('');
+                      }}
+                    >
+                      <div className="po-product-title">{p.name}</div>
+                      <div className="po-product-sku">SKU: {p.sku || 'N/A'} - Brand: {p.brand_name || 'Standard'}</div>
+                      <div className="po-product-meta">
+                        <span className="po-product-price">Rs.{Number(p.purchase_price || 850).toFixed(2)}</span>
+                        <button type="button" className={`btn sm ${isSelected ? 'primary' : ''}`}>
+                          {isSelected ? 'Selected' : 'Select'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {filteredProducts.length === 0 && (
+                <div style={{ padding: '36px 16px', textAlign: 'center' }}>
+                  <p className="muted">No products found matching &quot;{productSearch}&quot; in this category.</p>
+                  <button className="btn primary" onClick={() => setInlineModal('product')}>
+                    + Create &quot;{productSearch || 'Custom Product'}&quot;
+                  </button>
+                </div>
+              )}
+
+              <div className="row mt">
+                <button className="btn" onClick={() => goToStep(1)}>&larr; Back</button>
+                {selectedProduct && (
+                  <button className="btn primary right" onClick={() => goToStep(3)}>Continue to Brand &rarr;</button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3: BRAND SELECTION */}
+          {step === 3 && (
+            <div className="panel">
+              <div className="row" style={{ alignItems: 'center', marginBottom: 12 }}>
+                <div>
+                  <h3 style={{ margin: 0 }}>4. Select Brand for {selectedProduct?.name}</h3>
+                  <div className="muted" style={{ fontSize: 12 }}>Choose the manufacturer brand or add a new one. Showing brands from {selectedCollection?.name || 'all collections'}.</div>
+                </div>
+                <button className="btn sm primary right" onClick={() => setInlineModal('brand')}>
+                  + Add New Brand
+                </button>
+              </div>
+
+              <div className="po-brand-grid">
+                {brands
+                  .filter((b) => {
+                    if (!selectedCollection) return true;
+                    const colls = Array.isArray(b.collections)
+                      ? b.collections
+                      : (typeof b.collections === 'string'
+                        ? (() => { try { const p = JSON.parse(b.collections); return Array.isArray(p) ? p : []; } catch (_) { return []; } })()
+                        : []);
+                    if (!colls.length) return true;
+                    return colls.some((c) => {
+                      if (!c) return false;
+                      const cid = typeof c === 'object' ? c.id : c;
+                      return cid === selectedCollection.id;
+                    });
+                  })
+                  .map((b) => {
+                    const isSelected = selectedBrand?.id === b.id;
+                    const initials = (b.brand_name || '?').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+                    return (
+                      <div
+                        key={b.id}
+                        className={`po-brand-tile ${isSelected ? 'selected' : ''}`}
+                        onClick={() => {
+                          setSelectedBrand(b);
+                          setStep(4);
+                          setError('');
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          {b.image_url ? (
+                            <img
+                              src={b.image_url}
+                              alt={b.brand_name}
+                              style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'contain', background: '#f8fafc', border: '1px solid #e2e8f0', flexShrink: 0 }}
+                            />
+                          ) : (
+                            <div style={{ width: 40, height: 40, borderRadius: 8, background: 'linear-gradient(135deg, #b98a2f, #d4a84b)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: 14, flexShrink: 0 }}>
+                              {initials}
+                            </div>
+                          )}
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: 14 }}>{b.brand_name}</div>
+                            {b.manufacturer && (
+                              <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>
+                                {b.manufacturer}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                <div className="po-brand-tile add-new" onClick={() => setInlineModal('brand')}>
+                  + Add New Brand
+                </div>
+              </div>
+
+              <div className="row mt">
+                <button className="btn" onClick={() => goToStep(2)}>&larr; Back</button>
+                {selectedBrand && (
+                  <button className="btn primary right" onClick={() => goToStep(4)}>Continue to Sizes &rarr;</button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* STEP 4: SIZES SELECTION */}
+          {step === 4 && (
+            <div className="panel">
+              <div className="row" style={{ alignItems: 'center', marginBottom: 8 }}>
+                <h3 style={{ margin: 0 }}>5. Select Sizes to Include</h3>
+                <button
+                  className="btn sm ghost right"
+                  onClick={() => {
+                    setSelectedSizes([...availableSizes]);
+                    setError('');
+                  }}
+                >
+                  Select All Sizes
+                </button>
+              </div>
+              <p className="muted" style={{ fontSize: 13, margin: '0 0 14px' }}>
+                Pick all sizes needed for this order. Industry sizes tailored for {selectedSection?.name || 'apparel'}.
+              </p>
+
+              <div className="po-chip-group">
+                {availableSizes.map((sz) => {
+                  const isSelected = selectedSizes.includes(sz);
+                  return (
+                    <div
+                      key={sz}
+                      className={`po-size-chip ${isSelected ? 'selected' : ''}`}
+                      onClick={() => toggleSize(sz)}
+                    >
+                      {sz}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div style={{ marginTop: 14 }}>
+                <span className="muted" style={{ fontSize: 12 }}>Selected sizes: </span>
+                {selectedSizes.length > 0 ? (
+                  selectedSizes.map((sz) => (
+                    <span key={sz} className="po-tag" style={{ marginRight: 6 }}>
+                      {sz} <span className="po-tag-remove" onClick={() => toggleSize(sz)}>×</span>
+                    </span>
+                  ))
+                ) : (
+                  <span className="muted" style={{ fontStyle: 'italic', fontSize: 12 }}>None selected yet. Click size chips above.</span>
+                )}
+              </div>
+
+              <div className="row mt">
+                <button className="btn" onClick={() => goToStep(3)}>&larr; Back</button>
+                <button
+                  className="btn primary right"
+                  disabled={selectedSizes.length === 0}
+                  onClick={() => goToStep(5)}
+                >
+                  Continue to Colors &rarr;
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 5: COLOR SELECTION */}
+          {step === 5 && (
+            <div className="panel">
+              <div className="row" style={{ alignItems: 'center', marginBottom: 8 }}>
+                <h3 style={{ margin: 0 }}>6. Select Color Variants</h3>
+                <button className="btn sm right" onClick={() => setInlineModal('color')}>
+                  + Add Custom Color
+                </button>
+              </div>
+              <p className="muted" style={{ fontSize: 13, margin: '0 0 14px' }}>
+                Choose one or multiple colors. Each color will be combined with your selected sizes.
+              </p>
+
+              <div className="po-chip-group">
+                {STANDARD_COLORS.map((c) => {
+                  const isSelected = selectedColors.includes(c.name);
+                  return (
+                    <div
+                      key={c.name}
+                      className={`po-color-chip ${isSelected ? 'selected' : ''}`}
+                      onClick={() => toggleColor(c.name)}
+                    >
+                      <span className="po-color-dot" style={{ background: c.hex }} />
+                      <span>{c.name}</span>
+                    </div>
+                  );
+                })}
+                {colours
+                  .filter((c) => !STANDARD_COLORS.some((sc) => sc.name.toLowerCase() === c.name.toLowerCase()))
+                  .map((c) => {
+                    const isSelected = selectedColors.includes(c.name);
+                    return (
+                      <div
+                        key={c.id}
+                        className={`po-color-chip ${isSelected ? 'selected' : ''}`}
+                        onClick={() => toggleColor(c.name)}
+                      >
+                        <span className="po-color-dot" style={{ background: '#94a3b8' }} />
+                        <span>{c.name}</span>
+                      </div>
+                    );
+                  })}
+              </div>
+
+              <div style={{ marginTop: 14 }}>
+                <span className="muted" style={{ fontSize: 12 }}>Selected colors: </span>
+                {selectedColors.map((c) => (
+                  <span key={c} className="po-tag" style={{ marginRight: 6 }}>
+                    {c} <span className="po-tag-remove" onClick={() => toggleColor(c)}>×</span>
+                  </span>
+                ))}
+              </div>
+
+              <div className="row mt">
+                <button className="btn" onClick={() => goToStep(4)}>&larr; Back</button>
+                <button
+                  className="btn primary right"
+                  disabled={selectedColors.length === 0}
+                  onClick={() => goToStep(6)}
+                >
+                  Continue to Quantity Matrix &rarr;
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 6: QUANTITY MATRIX */}
+          {step === 6 && (
+            <div className="panel">
+              <div className="row" style={{ alignItems: 'center', marginBottom: 10 }}>
+                <div>
+                  <h3 style={{ margin: 0 }}>7. Enter Quantities per Color & Size</h3>
+                  <div className="muted" style={{ fontSize: 12 }}>Non-negative piece counts for {selectedProduct?.name} ({selectedBrand?.brand_name})</div>
+                </div>
+                <div className="right row" style={{ alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 12, color: 'var(--muted)' }}>Quick Fill:</span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={quickFillQty}
+                    onChange={(e) => setQuickFillQty(e.target.value)}
+                    style={{ width: 54, padding: '4px 6px', textAlign: 'center', border: '1px solid var(--line)', borderRadius: 6 }}
+                  />
+                  <button className="btn sm" onClick={applyQuickFill}>Fill All</button>
+                </div>
+              </div>
+
+              <div className="po-matrix-container">
+                <table className="po-matrix-table">
+                  <thead>
+                    <tr>
+                      <th>Color</th>
+                      <th>Size</th>
+                      <th style={{ width: 120 }}>Quantity (pcs)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedColors.flatMap((c) =>
+                      selectedSizes.map((sz) => {
+                        const key = `${c}__${sz}`;
+                        return (
+                          <tr key={key}>
+                            <td>
+                              <strong>{c}</strong>
+                            </td>
+                            <td>
+                              <span className="chip">{sz}</span>
+                            </td>
+                            <td>
+                              <input
+                                type="number"
+                                min="0"
+                                className="po-matrix-input"
+                                value={quantities[key] ?? ''}
+                                onChange={(e) => {
+                                  const val = Math.max(0, parseInt(e.target.value, 10) || 0);
+                                  setQuantities({ ...quantities, [key]: val });
+                                }}
+                                placeholder="0"
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="row mt" style={{ alignItems: 'center', background: '#f8fafc', padding: '12px 16px', borderRadius: 8 }}>
+                <strong style={{ fontSize: 15 }}>Total Quantity: {currentLineCalc.totalQty} Pieces</strong>
+                <span className="muted" style={{ marginLeft: 12, fontSize: 13 }}>
+                  across {selectedColors.length * selectedSizes.length} variant combinations
+                </span>
+              </div>
+
+              <div className="row mt">
+                <button className="btn" onClick={() => goToStep(5)}>&larr; Back</button>
+                <button
+                  className="btn primary right"
+                  disabled={currentLineCalc.totalQty <= 0}
+                  onClick={() => goToStep(7)}
+                >
+                  Continue to Pricing &rarr;
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 7: PRICING & MARGINS */}
+          {step === 7 && (
+            <div className="panel">
+              <h3>8. Pricing, Margin & Selling Value Calculation</h3>
+              <p className="muted" style={{ fontSize: 13, margin: '0 0 16px' }}>
+                Enter purchase price and target margin. Selling price and net profit per piece calculate automatically.
+              </p>
+
+              <div className="fields-2">
+                <Field label="Purchase Value / Cost Price (Rs. per piece)" hint="Must be greater than 0">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={purchasePrice}
+                    onChange={(e) => setPurchasePrice(e.target.value)}
+                  />
+                </Field>
+                <Field label="Expected Margin %" hint="Profit margin percentage applied to cost">
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={marginPercent}
+                    onChange={(e) => setMarginPercent(e.target.value)}
+                  />
+                </Field>
+              </div>
+
+              {/* Real-time Calculation Panel */}
+              <div className="po-calc-panel">
+                <div className="po-calc-grid">
+                  <div className="po-calc-metric">
+                    <span className="po-calc-metric-label">Purchase Value</span>
+                    <span className="po-calc-metric-val">Rs.{currentLineCalc.purchasePrice.toFixed(2)}</span>
+                  </div>
+                  <div className="po-calc-metric">
+                    <span className="po-calc-metric-label">Margin Applied</span>
+                    <span className="po-calc-metric-val">{currentLineCalc.marginPercent}%</span>
+                  </div>
+                  <div className="po-calc-metric">
+                    <span className="po-calc-metric-label">Selling Price</span>
+                    <span className="po-calc-metric-val">Rs.{currentLineCalc.sellingPrice.toFixed(2)}</span>
+                  </div>
+                  <div className="po-calc-metric">
+                    <span className="po-calc-metric-label">Profit / Piece</span>
+                    <span className="po-calc-metric-val profit">Rs.{currentLineCalc.profitPerPiece.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                <div style={{ borderTop: '1px solid #e2e8f0', marginTop: 14, paddingTop: 12 }} className="po-calc-grid">
+                  <div className="po-calc-metric">
+                    <span className="po-calc-metric-label">Line Total Qty</span>
+                    <span className="po-calc-metric-val">{currentLineCalc.totalQty} Pieces</span>
+                  </div>
+                  <div className="po-calc-metric">
+                    <span className="po-calc-metric-label">Total Purchase Value</span>
+                    <span className="po-calc-metric-val">Rs.{currentLineCalc.totalPurchase.toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className="po-calc-metric">
+                    <span className="po-calc-metric-label">Total Expected Sales</span>
+                    <span className="po-calc-metric-val">Rs.{currentLineCalc.totalSelling.toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className="po-calc-metric">
+                    <span className="po-calc-metric-label">Total Expected Profit</span>
+                    <span className="po-calc-metric-val profit">Rs.{currentLineCalc.totalProfit.toLocaleString('en-IN')}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="row mt" style={{ gap: 12 }}>
+                <button className="btn" onClick={() => goToStep(6)}>&larr; Back</button>
+                <button
+                  className="btn"
+                  style={{ marginLeft: 'auto', fontWeight: 600 }}
+                  onClick={() => commitCurrentLineToCart('stay')}
+                >
+                  + Add Another Product
+                </button>
+                <button
+                  className="btn primary"
+                  onClick={() => commitCurrentLineToCart('review')}
+                >
+                  Review Order &rarr;
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 8: FINAL REVIEW & SUBMIT */}
+          {step === 8 && (
+            <div className="panel">
+              <h3>9. Review & Finalize Purchase Order</h3>
+              <p className="muted" style={{ fontSize: 13, margin: '0 0 16px' }}>
+                Verify supplier details, line items, and financial summary before creating the purchase order.
+              </p>
+
+              {/* Order Metadata Form */}
+              <div className="fields-3" style={{ marginBottom: 16 }}>
+                <Field label="Supplier / Dealer" hint="Mandatory vendor assignment">
+                  <div className="row" style={{ gap: 6 }}>
+                    <select
+                      value={orderHeader.supplierId}
+                      onChange={(e) => setOrderHeader({ ...orderHeader, supplierId: e.target.value })}
+                      style={{ flex: 1 }}
+                    >
+                      <option value="">— Select Supplier —</option>
+                      {suppliers.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.company_name} ({s.code})
+                        </option>
+                      ))}
+                    </select>
+                    <button className="btn sm" type="button" onClick={() => setInlineModal('supplier')}>+ New</button>
+                  </div>
+                </Field>
+
+                <Field label="Division / Hub">
+                  <select
+                    value={orderHeader.divisionId}
+                    onChange={(e) => setOrderHeader({ ...orderHeader, divisionId: e.target.value })}
+                  >
+                    {divisions.map((d) => (
+                      <option key={d.id} value={d.id}>{d.name} ({d.code})</option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Expected Delivery Date">
+                  <input
+                    type="date"
+                    value={orderHeader.expectedDeliveryDate}
+                    onChange={(e) => setOrderHeader({ ...orderHeader, expectedDeliveryDate: e.target.value })}
+                  />
+                </Field>
+              </div>
+
+              <div className="fields-2" style={{ marginBottom: 18 }}>
+                <Field label="Tax Scheme">
+                  <select
+                    value={orderHeader.taxScheme}
+                    onChange={(e) => setOrderHeader({ ...orderHeader, taxScheme: e.target.value })}
+                  >
+                    <option value="GST_INTRA">GST Intra-state (CGST + SGST)</option>
+                    <option value="GST_INTER">GST Inter-state (IGST)</option>
+                  </select>
+                </Field>
+                <Field label="Remarks / Procurement Notes">
+                  <input
+                    placeholder="e.g. Urgent delivery required for festive collection"
+                    value={orderHeader.remarks}
+                    onChange={(e) => setOrderHeader({ ...orderHeader, remarks: e.target.value })}
+                  />
+                </Field>
+              </div>
+
+              {/* Items Table */}
+              <h4 style={{ margin: '14px 0 8px', color: 'var(--brand-ink)' }}>Purchase Order Items ({cartLines.length})</h4>
+              <div style={{ overflowX: 'auto', border: '1px solid var(--line)', borderRadius: 8, marginBottom: 16 }}>
+                <table className="grid">
+                  <thead>
+                    <tr>
+                      <th>Product</th>
+                      <th>Brand</th>
+                      <th>Sizes & Colors</th>
+                      <th className="num">Qty</th>
+                      <th className="num">Cost / Unit</th>
+                      <th className="num">Margin</th>
+                      <th className="num">Selling Price</th>
+                      <th className="num">Profit / Piece</th>
+                      <th className="num">Total Value</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cartLines.map((line, idx) => (
+                      <tr key={line.id || idx}>
+                        <td>
+                          <strong>{line.product?.name}</strong>
+                          <div className="muted" style={{ fontSize: 11 }}>SKU: {line.product?.sku}</div>
+                        </td>
+                        <td>{line.brand?.brand_name || '—'}</td>
+                        <td>
+                          <div style={{ fontSize: 12 }}>{line.colors?.join(', ')}</div>
+                          <div className="muted" style={{ fontSize: 11 }}>{line.sizes?.join(', ')}</div>
+                        </td>
+                        <td className="num"><strong>{line.totalQty}</strong></td>
+                        <td className="num">Rs.{line.purchasePrice?.toFixed(2)}</td>
+                        <td className="num">{line.marginPercent}%</td>
+                        <td className="num">Rs.{line.sellingPrice?.toFixed(2)}</td>
+                        <td className="num" style={{ color: '#16a34a' }}>+Rs.{line.profitPerPiece?.toFixed(2)}</td>
+                        <td className="num"><strong><Money value={line.totalPurchase} /></strong></td>
+                        <td style={{ textAlign: 'center' }}>
+                          <button
+                            className="btn sm danger"
+                            style={{ padding: '2px 8px' }}
+                            onClick={() => removeCartLine(line.id)}
+                            title="Remove line"
+                          >
+                            ×
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {cartLines.length === 0 && (
+                      <tr>
+                        <td colSpan={10} style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>
+                          No items committed to this purchase order yet. Click &quot;Add Another Product&quot; to configure lines.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="row" style={{ gap: 12, alignItems: 'center' }}>
+                <button className="btn" onClick={() => goToStep(7)}>
+                  &larr; Back to Pricing
+                </button>
+                <button
+                  className="btn"
+                  onClick={() => {
+                    setSelectedProduct(null);
+                    setSelectedBrand(null);
+                    setSelectedSizes([]);
+                    setSelectedColors([]);
+                    setQuantities({});
+                    setStep(2);
+                  }}
+                >
+                  + Add More Products
+                </button>
+
+                <div className="right row" style={{ gap: 10 }}>
+                  <button
+                    className="btn"
+                    disabled={busy || cartLines.length === 0}
+                    onClick={() => handleFinalSave(false)}
+                  >
+                    {busy ? 'Saving…' : editId ? 'Save Draft Changes' : 'Save Draft'}
+                  </button>
+                  {hasPermission('po.submit') && (
+                    <button
+                      className="btn accent"
+                      disabled={busy || cartLines.length === 0}
+                      onClick={() => handleFinalSave(true)}
+                    >
+                      {busy ? 'Submitting…' : 'Create & Submit for Approval'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right: Persistent Working PO Cart */}
+        <div className="po-wizard-sidebar">
+          <div className="po-cart-panel">
+            <div className="po-cart-title">
+              <span>Current PO Cart</span>
+              <span className="po-cart-badge">{cartSummary.itemCount} SKUs</span>
+            </div>
+
+            {/* List of items in cart */}
+            <div style={{ maxHeight: 280, overflowY: 'auto' }}>
+              {cartLines.map((line, i) => (
+                <div key={line.id || i} className="po-cart-item">
+                  <div className="po-cart-item-header">
+                    <span>{line.product?.name}</span>
+                    <span style={{ color: '#b3261e', cursor: 'pointer' }} onClick={() => removeCartLine(line.id)}>×</span>
+                  </div>
+                  <div className="po-cart-item-sub">
+                    {line.brand?.brand_name} - {line.totalQty} pcs - Rs.{line.purchasePrice}/pc
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontWeight: 700 }}>
+                    <span style={{ color: '#16a34a', fontSize: 11.5 }}>+{line.marginPercent}% (Rs.{line.totalProfit} profit)</span>
+                    <span>Rs.{line.totalPurchase?.toLocaleString('en-IN')}</span>
+                  </div>
+                </div>
+              ))}
+              {cartLines.length === 0 && (
+                <div className="po-cart-empty">
+                  <div className="po-cart-empty-icon">
+                    <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="9" cy="21" r="1.2" />
+                      <circle cx="20" cy="21" r="1.2" />
+                      <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+                    </svg>
+                  </div>
+                  <div className="po-cart-empty-title">No items in cart yet</div>
+                  <p className="po-cart-empty-desc">
+                    Select a product, sizes, and quantities to add.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Cart Aggregations */}
+            <div className="po-cart-totals">
+              <div className="po-cart-totals-row">
+                <span className="po-cart-totals-label">Total Quantity:</span>
+                <span className="po-cart-totals-val">{cartSummary.totalPieces} Pieces</span>
+              </div>
+              <div className="po-cart-totals-row">
+                <span className="po-cart-totals-label">Purchase Value:</span>
+                <span className="po-cart-totals-val">Rs.{cartSummary.totalPurchaseVal.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="po-cart-totals-row">
+                <span className="po-cart-totals-label">Expected Sales:</span>
+                <span className="po-cart-totals-val">Rs.{cartSummary.totalSellingVal.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="po-cart-totals-row profit">
+                <span className="po-cart-totals-label">Expected Profit:</span>
+                <span className="po-cart-totals-val">Rs.{cartSummary.totalProfit.toLocaleString('en-IN')} ({cartSummary.overallMargin}%)</span>
+              </div>
+              <div className="po-cart-totals-row grand">
+                <span className="po-cart-grand-label">Total (incl. GST):</span>
+                <span className="po-cart-grand-val">Rs.{cartSummary.grandTotal.toLocaleString('en-IN')}</span>
+              </div>
+            </div>
+
+            <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {step < 8 && cartLines.length > 0 && (
+                <button className="btn primary" style={{ width: '100%' }} onClick={() => goToStep(8)}>
+                  Review & Finalize Order ({cartSummary.itemCount}) &rarr;
+                </button>
+              )}
+              {step >= 2 && step <= 7 && selectedProduct && currentLineCalc.totalQty > 0 && (
+                <button
+                  className="btn"
+                  style={{ width: '100%', fontSize: 12.5 }}
+                  onClick={() => commitCurrentLineToCart('stay')}
+                >
+                  + Add Another Product
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ---------- Inline Modal: Add New Brand ---------- */}
+      {inlineModal === 'brand' && (
+        <Modal title="+ Add New Brand" onClose={() => setInlineModal(null)}>
+          <div style={{ padding: '8px 0' }}>
+            <Field label="Brand Name" hint="Brand name must be unique">
+              <input
+                placeholder="e.g. Louis Philippe"
+                value={brandForm.brandName}
+                onChange={(e) => setBrandForm({ ...brandForm, brandName: e.target.value })}
+                autoFocus
+              />
+            </Field>
+            <div className="fields-2">
+              <Field label="Brand Code (Optional)" hint="e.g. LP">
+                <input
+                  placeholder="e.g. LP"
+                  value={brandForm.brandCode}
+                  onChange={(e) => setBrandForm({ ...brandForm, brandCode: e.target.value })}
+                />
+              </Field>
+              <Field label="Company / Manufacturer">
+                <input
+                  placeholder="e.g. Madura Fashion & Lifestyle"
+                  value={brandForm.manufacturer}
+                  onChange={(e) => setBrandForm({ ...brandForm, manufacturer: e.target.value })}
+                />
+              </Field>
+            </div>
+            <div className="row mt" style={{ justifyContent: 'flex-end', gap: 8 }}>
+              <button className="btn" onClick={() => setInlineModal(null)}>Cancel</button>
+              <button className="btn primary" disabled={busy || !brandForm.brandName.trim()} onClick={handleCreateBrand}>
+                {busy ? 'Saving…' : 'Save Brand'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ---------- Inline Modal: Add Custom Color ---------- */}
+      {inlineModal === 'color' && (
+        <Modal title="+ Add Custom Color" onClose={() => setInlineModal(null)}>
+          <div style={{ padding: '8px 0' }}>
+            <Field label="Color Name" hint="e.g. Sage Green, Coral Pink">
+              <input
+                placeholder="e.g. Mustard Yellow"
+                value={colorForm.name}
+                onChange={(e) => setColorForm({ ...colorForm, name: e.target.value })}
+                autoFocus
+              />
+            </Field>
+            <div className="row mt" style={{ justifyContent: 'flex-end', gap: 8 }}>
+              <button className="btn" onClick={() => setInlineModal(null)}>Cancel</button>
+              <button className="btn primary" disabled={busy || !colorForm.name.trim()} onClick={handleCreateColor}>
+                {busy ? 'Adding…' : 'Add Color'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ---------- Inline Modal: Add Custom Product ---------- */}
+      {inlineModal === 'product' && (
+        <Modal title="+ Add New Product" onClose={() => setInlineModal(null)}>
+          <div style={{ padding: '8px 0' }}>
+            <Field label="Product Name" hint="Full descriptive name">
+              <input
+                placeholder="e.g. Premium Cotton Formal Shirt"
+                value={customProductForm.name}
+                onChange={(e) => setCustomProductForm({ ...customProductForm, name: e.target.value })}
+                autoFocus
+              />
+            </Field>
+            <div className="fields-3">
+              <Field label="SKU (Optional)">
+                <input
+                  placeholder="e.g. RAY-SH-09"
+                  value={customProductForm.sku}
+                  onChange={(e) => setCustomProductForm({ ...customProductForm, sku: e.target.value })}
+                />
+              </Field>
+              <Field label="HSN Code">
+                <input
+                  placeholder="6205"
+                  value={customProductForm.hsn}
+                  onChange={(e) => setCustomProductForm({ ...customProductForm, hsn: e.target.value })}
+                />
+              </Field>
+              <Field label="Estimated Cost (Rs.)">
+                <input
+                  type="number"
+                  min="0"
+                  value={customProductForm.purchasePrice}
+                  onChange={(e) => setCustomProductForm({ ...customProductForm, purchasePrice: e.target.value })}
+                />
+              </Field>
+            </div>
+            <div className="row mt" style={{ justifyContent: 'flex-end', gap: 8 }}>
+              <button className="btn" onClick={() => setInlineModal(null)}>Cancel</button>
+              <button className="btn primary" disabled={busy || !customProductForm.name.trim()} onClick={handleCreateCustomProduct}>
+                {busy ? 'Creating…' : 'Create & Select Product'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ---------- Inline Modal: Add Supplier ---------- */}
+      {inlineModal === 'supplier' && (
+        <Modal title="+ Add New Supplier" onClose={() => setInlineModal(null)}>
+          <div style={{ padding: '8px 0' }}>
+            <div className="fields-2">
+              <Field label="Company Name">
+                <input
+                  placeholder="e.g. Arvind Textiles Ltd"
+                  value={supplierForm.companyName}
+                  onChange={(e) => setSupplierForm({ ...supplierForm, companyName: e.target.value })}
+                  autoFocus
+                />
+              </Field>
+              <Field label="Supplier Code">
+                <input
+                  placeholder="e.g. ARV-01"
+                  value={supplierForm.code}
+                  onChange={(e) => setSupplierForm({ ...supplierForm, code: e.target.value })}
+                />
+              </Field>
+            </div>
+            <div className="fields-3">
+              <Field label="Contact Person">
+                <input
+                  placeholder="e.g. Rajesh Kumar"
+                  value={supplierForm.contactPerson}
+                  onChange={(e) => setSupplierForm({ ...supplierForm, contactPerson: e.target.value })}
+                />
+              </Field>
+              <Field label="Phone / Mobile">
+                <PhoneInput 
+                  value={supplierForm.mobile || ''} 
+                  onChange={(e) => setSupplierForm({ ...supplierForm, mobile: e.target.value })} 
+                />
+              </Field>
+              <Field label="GSTIN">
+                <input
+                  placeholder="29AAAAA0000A1Z5"
+                  value={supplierForm.gstin}
+                  onChange={(e) => setSupplierForm({ ...supplierForm, gstin: e.target.value })}
+                />
+              </Field>
+            </div>
+            <div className="row mt" style={{ justifyContent: 'flex-end', gap: 8 }}>
+              <button className="btn" onClick={() => setInlineModal(null)}>Cancel</button>
+              <button className="btn primary" disabled={busy || !supplierForm.companyName.trim()} onClick={handleCreateSupplier}>
+                {busy ? 'Saving…' : 'Save Supplier'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}

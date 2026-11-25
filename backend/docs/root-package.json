@@ -1,0 +1,19 @@
+{
+  "name": "bsc-exclusive-poms",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "BSC Exclusive Purchase Order Management System (POMS)",
+  "private": true,
+  "scripts": {
+    "dev": "run.bat",
+    "start": "run.bat",
+    "backend": "cd backend && npm run dev",
+    "frontend": "cd frontend && npm run dev",
+    "build": "npm run build --prefix frontend",
+    "test": "npm run check --prefix backend",
+    "audit": "npm audit --prefix backend && npm audit --prefix frontend",
+    "migrate": "npm run db:migrate --prefix backend"
+  },
+  "devDependencies": {
+  }
+}
