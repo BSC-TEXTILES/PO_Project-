@@ -20,9 +20,7 @@ export const assetUrl = (url) => {
 
 const api = axios.create({ baseURL: API_BASE });
 
-// ─── Token integration ──────────────────────────────────────────────────────
-// A module-level getter is set by the AuthProvider so that the Axios
-// interceptor can attach the current JWT without importing React hooks.
+// ─── Token integration & Automatic Token Refresh ────────────────────────────
 let _getToken = null;
 export function setTokenGetter(fn) { _getToken = fn; }
 
@@ -36,17 +34,75 @@ api.interceptors.request.use(async (cfg) => {
   return cfg;
 });
 
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) prom.reject(error);
+    else prom.resolve(token);
+  });
+  failedQueue = [];
+};
+
 api.interceptors.response.use(
   (r) => r,
-  (err) => {
+  async (err) => {
+    const originalRequest = err.config;
     const isPublicPage = ['/login', '/landing', '/signup', '/privacy', '/terms', '/security']
-      .some((p) => window.location.pathname.startsWith(p));
-    if (err.response?.status === 401 && !isPublicPage) {
+      .some((p) => typeof window !== 'undefined' && window.location.pathname.startsWith(p));
+
+    if (err.response?.status === 401 && originalRequest && !originalRequest._retry && !isPublicPage) {
+      if (originalRequest.url?.includes('/auth/refresh') || originalRequest.url?.includes('/auth/login')) {
+        return Promise.reject(err);
+      }
+
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then((token) => {
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+            return api(originalRequest);
+          })
+          .catch((e) => Promise.reject(e));
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
       try {
-        localStorage.removeItem('poms_token');
-        sessionStorage.setItem('poms_logout_reason', 'Your session has expired. Please sign in again.');
-      } catch { /* ignore */ }
-      window.location.href = '/login';
+        const currentToken = localStorage.getItem('poms_token');
+        if (!currentToken) throw new Error('No token to refresh');
+
+        const { data } = await axios.post(
+          `${API_BASE}/auth/refresh`,
+          {},
+          { headers: { Authorization: `Bearer ${currentToken}` } }
+        );
+
+        const newToken = data.token;
+        if (!newToken) throw new Error('Refresh response missing token');
+
+        localStorage.setItem('poms_token', newToken);
+        setTokenGetter(() => Promise.resolve(newToken));
+        processQueue(null, newToken);
+
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        return api(originalRequest);
+      } catch (refreshErr) {
+        processQueue(refreshErr, null);
+        try {
+          localStorage.removeItem('poms_token');
+          sessionStorage.setItem('poms_logout_reason', 'Your session has expired. Please sign in again.');
+        } catch {}
+        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+          window.location.href = '/login';
+        }
+        return Promise.reject(refreshErr);
+      } finally {
+        isRefreshing = false;
+      }
     }
     return Promise.reject(err);
   }

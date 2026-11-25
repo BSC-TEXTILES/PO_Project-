@@ -212,6 +212,45 @@ r.post('/signup', rateLimit(5, 60 * 1000), validate({ body: signupSchema }), ah(
   res.status(201).json({ message: 'Account created successfully' });
 }));
 
+// POST /api/auth/refresh — auto-renew session token
+r.post('/refresh', ah(async (req, res) => {
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : (req.body?.token || null);
+  if (!token) {
+    return res.status(401).json({ error: { message: 'Token required for refresh', code: 'TOKEN_REQUIRED' } });
+  }
+
+  const hashed = hashToken(token);
+  const { rows } = await query(
+    `SELECT user_id, tab_id FROM user_sessions
+      WHERE token_hash = $1 AND logout_at IS NULL
+      LIMIT 1`,
+    [hashed]
+  );
+
+  if (!rows || rows.length === 0) {
+    return res.status(401).json({ error: { message: 'Session expired or invalid', code: 'SESSION_EXPIRED' } });
+  }
+
+  const { user_id: userId, tab_id: tabId } = rows[0];
+  const user = await loadUser(userId);
+  if (!user || user.status !== 'active') {
+    return res.status(401).json({ error: { message: 'User account is inactive', code: 'USER_INACTIVE' } });
+  }
+
+  const newToken = generateSessionToken();
+  const newHashed = hashToken(newToken);
+
+  await query(
+    `UPDATE user_sessions
+        SET token_hash = $1, last_seen_at = now()
+      WHERE token_hash = $2`,
+    [newHashed, hashed]
+  );
+
+  res.json({ token: newToken, user });
+}));
+
 // POST /api/auth/logout — audit trail
 r.post('/logout', authenticate, ah(async (req, res) => {
   if (req.sessionId) {
