@@ -177,7 +177,18 @@ export async function ensureMigrations() {
             if (await markerExists(conn, cfg.database, m)) skip = true;
           }
           if (skip) continue;
-          await conn.query(st.sql);
+          try {
+            await conn.query(st.sql);
+          } catch (stErr) {
+            if ([
+              'ER_TABLE_EXISTS_ERROR', 'ER_DUP_KEYNAME', 'ER_FK_DUP_NAME',
+              'ER_DUP_ENTRY', 'ER_CANT_DROP_FIELD_OR_KEY',
+            ].includes(stErr.code) || /already exists/i.test(stErr.message)) {
+              console.warn(`  ↳ skipped existing constraint/table (${stErr.code || 'EXISTS'})`);
+              continue;
+            }
+            throw stErr;
+          }
         }
         await conn.query(
           'INSERT INTO schema_migrations (version, checksum, duration_ms) VALUES (?, ?, ?)',

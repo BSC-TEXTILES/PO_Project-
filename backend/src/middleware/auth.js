@@ -77,21 +77,21 @@ const USER_SELECT = `${USER_COLUMNS} WHERE u.id = $1`;
 // utf8mb4_0900_ai_ci makes this comparison case-insensitive (was lower() = lower()).
 const USER_SELECT_BY_EMAIL = `${USER_COLUMNS} WHERE u.email = $1`;
 
-// Resilient fallback query in case migration 007 (user_permissions / employee_id) is pending
+// Resilient fallback query in case migration 007 (user_permissions / employee_id / roles.status) is pending
 const FALLBACK_USER_COLUMNS = `
   SELECT u.id, u.email, u.username, u.full_name, u.status, u.force_password_reset,
          u.profile_photo_url, u.designation, u.profile_updated_at,
          u.password_changed_at, u.failed_attempts, u.locked_until,
          (SELECT COALESCE(JSON_ARRAYAGG(r.code), JSON_ARRAY())
             FROM user_roles ur JOIN roles r ON r.id = ur.role_id
-           WHERE ur.user_id = u.id AND r.status = 'active') AS roles,
+           WHERE ur.user_id = u.id) AS roles,
          (SELECT COALESCE(JSON_ARRAYAGG(ud.division_id), JSON_ARRAY())
             FROM user_divisions ud WHERE ud.user_id = u.id) AS division_ids,
          (SELECT COALESCE(JSON_ARRAYAGG(us.section_id), JSON_ARRAY())
             FROM user_sections us WHERE us.user_id = u.id) AS section_ids,
          (SELECT COALESCE(JSON_ARRAYAGG(p.code), JSON_ARRAY())
             FROM user_roles ur
-            JOIN roles r ON r.id = ur.role_id AND r.status = 'active'
+            JOIN roles r ON r.id = ur.role_id
             JOIN role_permissions rp ON rp.role_id = ur.role_id
             JOIN permissions p ON p.id = rp.permission_id
            WHERE ur.user_id = u.id) AS role_permissions
@@ -144,8 +144,13 @@ export async function loadUser(userId) {
     return parseRow(rows[0]);
   } catch (err) {
     if (err.code === 'ER_BAD_FIELD_ERROR' || err.code === 'ER_NO_SUCH_TABLE') {
-      const { rows } = await query(FALLBACK_USER_SELECT, [userId]);
-      return parseRow(rows[0]);
+      try {
+        const { rows } = await query(FALLBACK_USER_SELECT, [userId]);
+        return parseRow(rows[0]);
+      } catch (fallbackErr) {
+        if (fallbackErr.code === 'ER_NO_SUCH_TABLE') return null;
+        throw fallbackErr;
+      }
     }
     throw err;
   }
@@ -157,8 +162,13 @@ export async function loadUserByEmail(email) {
     return parseRow(rows[0]);
   } catch (err) {
     if (err.code === 'ER_BAD_FIELD_ERROR' || err.code === 'ER_NO_SUCH_TABLE') {
-      const { rows } = await query(FALLBACK_USER_SELECT_BY_EMAIL, [email]);
-      return parseRow(rows[0]);
+      try {
+        const { rows } = await query(FALLBACK_USER_SELECT_BY_EMAIL, [email]);
+        return parseRow(rows[0]);
+      } catch (fallbackErr) {
+        if (fallbackErr.code === 'ER_NO_SUCH_TABLE') return null;
+        throw fallbackErr;
+      }
     }
     throw err;
   }
