@@ -3533,12 +3533,12 @@ html[data-theme='dark'] .collection-prod-section { background: transparent; }
 }
 
 /* ============================================================
-   DARK NAVIGATION THEME OVERRIDES
+   CLEAN LIGHT ENTERPRISE SIDEBAR & TOPBAR
    ============================================================ */
 .sidebar {
-  background: linear-gradient(160deg, #0f4c2e 0%, #15693f 50%, #1a7a4c 100%);
-  color: #fff;
-  border-color: #15693f;
+  background: var(--panel);
+  color: var(--ink);
+  border-color: var(--line);
 }
 
 .topbar {
@@ -3548,23 +3548,25 @@ html[data-theme='dark'] .collection-prod-section { background: transparent; }
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
 }
 
-/* Sidebar adjustments */
-.sidebar .brand-name { color: #fff; }
-.sidebar .brand-sub { color: rgba(255, 255, 255, 0.7); }
-.sidebar .nav-section-label { color: rgba(255, 255, 255, 0.7); }
-.sidebar .nav-link { color: rgba(255, 255, 255, 0.85); }
-.sidebar .nav-link:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
-.sidebar .nav-link.active { background: rgba(255, 255, 255, 0.2); color: #fff; }
-.sidebar .nav-link.active .icon, .sidebar .nav-link.active .collection-icon { color: #fff; }
-.sidebar .sidebar-foot { color: rgba(255, 255, 255, 0.7); }
-.sidebar .icon-btn, .sidebar .sidebar-hamburger-btn { color: rgba(255, 255, 255, 0.85); }
-.sidebar .icon-btn:hover, .sidebar .sidebar-hamburger-btn:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+/* Sidebar adjustments — high contrast slate on crisp white */
+.sidebar .brand-name { color: #0f172a; }
+.sidebar .brand-sub { color: #64748b; }
+.sidebar .nav-section-label { color: #64748b; }
+.sidebar .nav-link { color: #334155; }
+.sidebar .nav-link .icon, .sidebar .nav-link .collection-icon { color: #475569; opacity: 0.85; }
+.sidebar .nav-link:hover { background: #f1f5f9; color: #0f172a; }
+.sidebar .nav-link:hover .icon, .sidebar .nav-link:hover .collection-icon { color: #1d4ed8; opacity: 1; }
+.sidebar .nav-link.active { background: #eff6ff; color: #1d4ed8; font-weight: 600; }
+.sidebar .nav-link.active .icon, .sidebar .nav-link.active .collection-icon { color: #1d4ed8; opacity: 1; }
+.sidebar .sidebar-foot { color: #64748b; }
+.sidebar .icon-btn, .sidebar .sidebar-hamburger-btn { color: #475569; }
+.sidebar .icon-btn:hover, .sidebar .sidebar-hamburger-btn:hover { background: #f1f5f9; color: #0f172a; }
 
-.sidebar .nav-coll-btn { color: rgba(255, 255, 255, 0.85); }
-.sidebar .nav-coll-btn:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
-.sidebar .nav-sublink { color: rgba(255, 255, 255, 0.85); }
-.sidebar .nav-sublink:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
-.sidebar .nav-sublink.active { color: #fff; background: rgba(255, 255, 255, 0.2); }
+.sidebar .nav-coll-btn { color: #334155; }
+.sidebar .nav-coll-btn:hover { background: #f1f5f9; color: #0f172a; }
+.sidebar .nav-sublink { color: #475569; }
+.sidebar .nav-sublink:hover { background: #f1f5f9; color: #0f172a; }
+.sidebar .nav-sublink.active { color: #1d4ed8; background: #eff6ff; }
 
 /* Topbar adjustments (Clean White Header Theme) */
 .topbar .icon-btn {
@@ -5199,11 +5201,27 @@ html[data-theme='dark'] table.grid th {
 html[data-theme='dark'] table.grid tbody tr:hover {
   background: #1e293b;
 }
-html[data-theme='dark'] .nav-link {
+html[data-theme='dark'] .sidebar .brand-name {
+  color: #f8fafc;
+}
+html[data-theme='dark'] .sidebar .brand-sub,
+html[data-theme='dark'] .sidebar .nav-section-label,
+html[data-theme='dark'] .sidebar .sidebar-foot {
+  color: #94a3b8;
+}
+html[data-theme='dark'] .sidebar .nav-link {
   color: #cbd5e1;
 }
-html[data-theme='dark'] .nav-link.active {
-  background: rgba(29, 78, 216, 0.2);
+html[data-theme='dark'] .sidebar .nav-link:hover {
+  background: #1e293b;
+  color: #f8fafc;
+}
+html[data-theme='dark'] .sidebar .nav-link.active {
+  background: rgba(29, 78, 216, 0.25);
+  color: #60a5fa;
+}
+html[data-theme='dark'] .sidebar .nav-link.active .icon,
+html[data-theme='dark'] .sidebar .nav-link.active .collection-icon {
   color: #60a5fa;
 }
 html[data-theme='dark'] .ent-preset-btn {
