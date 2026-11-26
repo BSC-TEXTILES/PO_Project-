@@ -365,7 +365,7 @@ r.get('/', ah(async (req, res) => {
   if (to) { params.push(to); clauses.push(`po.po_date <= $${params.length}`); }
   if (search) {
     params.push(`%${search}%`);
-    clauses.push(`(po.po_number LIKE $${params.length} OR sup.company_name LIKE $${params.length} OR s.name LIKE $${params.length})`);
+    clauses.push(`(po.po_number LIKE $${params.length} OR sup.company_name LIKE $${params.length} OR s.name LIKE $${params.length} OR d.name LIKE $${params.length} OR d.code LIKE $${params.length} OR po.lr_number LIKE $${params.length})`);
   }
   const where = clauses.length ? 'WHERE ' + clauses.join(' AND ') : '';
   const limit = Math.min(Number(pageSize) || 20, 100);
@@ -373,7 +373,8 @@ r.get('/', ah(async (req, res) => {
   params.push(limit, offset);
   const { rows } = await query(
     `SELECT po.id, po.po_number, po.version, po.po_date, po.status, po.grand_total, po.subtotal,
-            po.expected_delivery_date, d.code AS division_code, d.name AS division_name,
+            po.expected_delivery_date, po.lr_number, po.transporter_name, po.dispatch_date, po.shipment_status,
+            d.code AS division_code, d.name AS division_name,
             dep.name AS department_name, s.name AS section_name, sup.company_name AS supplier_name,
             (SELECT COALESCE(SUM(total_quantity),0) FROM purchase_order_items i WHERE i.po_id = po.id) AS total_quantity
        FROM purchase_orders po
@@ -384,7 +385,10 @@ r.get('/', ah(async (req, res) => {
        ${where} ORDER BY po.created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`, params);
   const { rows: [{ count }] } = await query(
     `SELECT count(*) AS count FROM purchase_orders po
-       JOIN suppliers sup ON sup.id = po.supplier_id JOIN sections s ON s.id = po.section_id ${where}`, params.slice(0, params.length - 2));
+       JOIN divisions d ON d.id = po.division_id
+       JOIN departments dep ON dep.id = po.department_id
+       JOIN suppliers sup ON sup.id = po.supplier_id
+       JOIN sections s ON s.id = po.section_id ${where}`, params.slice(0, params.length - 2));
   res.json({ data: rows, total: count, page: Number(page), pageSize: limit });
 }));
 

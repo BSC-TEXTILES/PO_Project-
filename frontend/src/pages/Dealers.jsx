@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import api, { errMessage } from '../api.js';
 import Modal from '../components/Modal.jsx';
 import PhoneInput from '../components/PhoneInput.jsx';
+import { TableSkeleton } from '../components/Skeletons.jsx';
 
 export default function Dealers() {
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [error, setError] = useState('');
   const [modal, setModal] = useState(null);
@@ -15,6 +17,7 @@ export default function Dealers() {
 
   const blank = { code: '', companyName: '', contactPerson: '', phone: '', email: '', address: '', city: '', state: '', gstin: '', pan: '', paymentTerms: 'net_30', notes: '' };
   const load = () => {
+    setLoading(true);
     api.get('/dealers', { params: { page, limit: 20, search } })
       .then((r) => { setRows(r.data.data || []); setTotal(r.data.total || 0); setError(''); })
       .catch((e) => {
@@ -23,7 +26,8 @@ export default function Dealers() {
         } else {
           setError(errMessage(e));
         }
-      });
+      })
+      .finally(() => setLoading(false));
   };
   useEffect(load, [page, search]);
 
@@ -51,27 +55,31 @@ export default function Dealers() {
       </div>
       {error && <div className="alert error">{error}</div>}
       <div className="panel">
-        <label className="field" style={{ maxWidth: 300 }}><span className="field-label">Search</span>
+        <label className="field" style={{ maxWidth: 300, marginBottom: 14 }}><span className="field-label">Search</span>
           <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search dealers…" />
         </label>
-        <table className="grid">
-          <thead><tr><th>Code</th><th>Company</th><th>Contact</th><th>Phone</th><th>City</th><th>GSTIN</th><th>Status</th><th>Actions</th></tr></thead>
-          <tbody>
-            {rows.map((d) => (
-              <tr key={d.id}>
-                <td className="mono">{d.code}</td>
-                <td style={{ fontWeight: 600 }}>{d.company_name}</td>
-                <td>{d.contact_person || '—'}</td>
-                <td>{d.phone || '—'}</td>
-                <td>{d.city || '—'}</td>
-                <td className="mono">{d.gstin || '—'}</td>
-                <td><span className={`chip st-${d.status}`}>{d.status}</span></td>
-                <td><button className="btn sm" onClick={() => { setForm({ id: d.id, code: d.code, companyName: d.company_name, contactPerson: d.contact_person || '', phone: d.phone || '', email: d.email || '', address: d.address || '', city: d.city || '', state: d.state || '', gstin: d.gstin || '', pan: d.pan || '', paymentTerms: d.payment_terms || 'net_30', notes: d.notes || '' }); setModal('edit'); }}>Edit</button></td>
-              </tr>
-            ))}
-            {!rows.length && <tr><td colSpan={8} style={{ textAlign: 'center', padding: 20, color: '#6b7280' }}>No dealers found</td></tr>}
-          </tbody>
-        </table>
+        {loading && !rows.length ? (
+          <TableSkeleton rows={6} columns={8} />
+        ) : (
+          <table className="grid">
+            <thead><tr><th>Code</th><th>Company</th><th>Contact</th><th>Phone</th><th>City</th><th>GSTIN</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+              {rows.map((d) => (
+                <tr key={d.id}>
+                  <td className="mono">{d.code}</td>
+                  <td style={{ fontWeight: 600 }}>{d.company_name}</td>
+                  <td>{d.contact_person || '—'}</td>
+                  <td>{d.phone || '—'}</td>
+                  <td>{d.city || '—'}</td>
+                  <td className="mono">{d.gstin || '—'}</td>
+                  <td><span className={`chip st-${d.status}`}>{d.status}</span></td>
+                  <td><button className="btn sm" onClick={() => { setForm({ id: d.id, code: d.code, companyName: d.company_name, contactPerson: d.contact_person || '', phone: d.phone || '', email: d.email || '', address: d.address || '', city: d.city || '', state: d.state || '', gstin: d.gstin || '', pan: d.pan || '', paymentTerms: d.payment_terms || 'net_30', notes: d.notes || '' }); setModal('edit'); }}>Edit</button></td>
+                </tr>
+              ))}
+              {!rows.length && <tr><td colSpan={8} style={{ textAlign: 'center', padding: 20, color: '#6b7280' }}>No dealers found</td></tr>}
+            </tbody>
+          </table>
+        )}
       </div>
       {total > 20 && <div className="panel" style={{ textAlign: 'center' }}><button className="btn sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>← Prev</button><span style={{ margin: '0 12px', fontSize: 13 }}>Page {page} of {Math.ceil(total / 20)}</span><button className="btn sm" disabled={page * 20 >= total} onClick={() => setPage((p) => p + 1)}>Next →</button></div>}
       {modal && (

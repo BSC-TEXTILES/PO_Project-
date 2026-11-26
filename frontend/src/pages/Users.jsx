@@ -4,6 +4,7 @@ import api, { errMessage, uploadFile, assetUrl } from '../api.js';
 import PhoneInput from '../components/PhoneInput.jsx';
 import Icon from '../components/Icon.jsx';
 import { useAuth } from '../auth.jsx';
+import { TableSkeleton } from '../components/Skeletons.jsx';
 
 /* ─── helpers ─────────────────────────────────────────────── */
 function initials(name = '') {
@@ -402,12 +403,12 @@ export default function Users() {
       </div>
 
       {/* Table */}
-      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden' }}>
-        {loading ? (
-          <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af' }}>Loading users…</div>
-        ) : filtered.length === 0 ? (
-          <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af' }}>No users found</div>
-        ) : (
+      {loading ? (
+        <TableSkeleton rows={7} columns={7} />
+      ) : filtered.length === 0 ? (
+        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: 40, textAlign: 'center', color: '#9ca3af' }}>No users found</div>
+      ) : (
+        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden' }}>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
@@ -493,8 +494,8 @@ export default function Users() {
               </tbody>
             </table>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Modal */}
       {editing !== null && (

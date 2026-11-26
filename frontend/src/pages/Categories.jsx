@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import api, { errMessage } from '../api.js';
 import Modal from '../components/Modal.jsx';
+import { TableSkeleton } from '../components/Skeletons.jsx';
 
 const PARENT_CATEGORY_OPTIONS = [
   "Men's Wear",
@@ -15,6 +16,7 @@ export default function Categories() {
   const [searchParams] = useSearchParams();
   const sectionFilter = searchParams.get('sectionId') || '';
   const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [sections, setSections] = useState([]);
   const [error, setError] = useState('');
   const [modal, setModal] = useState(null);
@@ -22,8 +24,11 @@ export default function Categories() {
   const [saving, setSaving] = useState(false);
 
   const load = () => {
+    setLoading(true);
     api.get('/categories', { params: sectionFilter ? { sectionId: sectionFilter } : {} })
-      .then((r) => setRows(r.data.data || [])).catch((e) => setError(errMessage(e)));
+      .then((r) => setRows(r.data.data || []))
+      .catch((e) => setError(errMessage(e)))
+      .finally(() => setLoading(false));
     api.get('/sections').then((r) => setSections(r.data.data || [])).catch(() => {});
   };
   useEffect(load, [sectionFilter]);
@@ -71,39 +76,43 @@ export default function Categories() {
       )}
       {error && <div className="alert error">{error}</div>}
       <div className="panel">
-        <table className="grid">
-          <thead>
-            <tr>
-              <th>Code</th>
-              <th>Name</th>
-              <th>Section</th>
-              <th>Parent</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((c) => (
-              <tr key={c.id}>
-                <td className="mono">{c.code}</td>
-                <td style={{ fontWeight: 600 }}>{c.name}</td>
-                <td>{getSectionName(c.section_id)}</td>
-                <td>{getParentName(c.parent_category_id)}</td>
-                <td><span className={`chip st-${c.status}`}>{c.status}</span></td>
-                <td>
-                  <button
-                    className="btn sm danger"
-                    onClick={() => handleDelete(c)}
-                    title="Delete category"
-                  >
-                    Delete
-                  </button>
-                </td>
+        {loading && !rows.length ? (
+          <TableSkeleton rows={6} columns={6} />
+        ) : (
+          <table className="grid">
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Name</th>
+                <th>Section</th>
+                <th>Parent</th>
+                <th>Status</th>
+                <th>Actions</th>
               </tr>
-            ))}
-            {!rows.length && <tr><td colSpan={6} style={{ textAlign: 'center', padding: 20, color: '#6b7280' }}>No categories found</td></tr>}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map((c) => (
+                <tr key={c.id}>
+                  <td className="mono">{c.code}</td>
+                  <td style={{ fontWeight: 600 }}>{c.name}</td>
+                  <td>{getSectionName(c.section_id)}</td>
+                  <td>{getParentName(c.parent_category_id)}</td>
+                  <td><span className={`chip st-${c.status}`}>{c.status}</span></td>
+                  <td>
+                    <button
+                      className="btn sm danger"
+                      onClick={() => handleDelete(c)}
+                      title="Delete category"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {!rows.length && <tr><td colSpan={6} style={{ textAlign: 'center', padding: 20, color: '#6b7280' }}>No categories found</td></tr>}
+            </tbody>
+          </table>
+        )}
       </div>
       {modal && (
         <Modal title="Add Category" onClose={() => setModal(null)}>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../api.js';
 import Icon from '../../components/Icon.jsx';
+import { DashboardSkeleton } from '../../components/Skeletons.jsx';
 
 export default function LRDashboard() {
   const [data, setData] = useState(null);
@@ -29,12 +30,7 @@ export default function LRDashboard() {
   }, []);
 
   if (loading && !data) {
-    return (
-      <div style={{ textAlign: 'center', padding: '60px 0', color: '#64748b' }}>
-        <div className="login-spinner" style={{ margin: '0 auto 16px' }} />
-        <p>Loading real-time shipment and location statistics...</p>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   const { overall = {}, locationStats = {}, transporterStats = [], dailyTrends = [] } = data || {};

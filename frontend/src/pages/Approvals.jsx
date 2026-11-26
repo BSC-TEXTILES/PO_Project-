@@ -3,16 +3,22 @@ import { Link } from 'react-router-dom';
 import api, { errMessage } from '../api.js';
 import Modal from '../components/Modal.jsx';
 import { Money } from '../components/DataTable.jsx';
+import { TableSkeleton } from '../components/Skeletons.jsx';
 
 export default function Approvals() {
   const [queue, setQueue] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [acting, setActing] = useState(null); // {poId, poNumber, action}
   const [comments, setComments] = useState('');
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(() => {
-    api.get('/approvals/queue').then((r) => setQueue(r.data.data || [])).catch((e) => setError(errMessage(e)));
+    setLoading(true);
+    api.get('/approvals/queue')
+      .then((r) => setQueue(r.data.data || []))
+      .catch((e) => setError(errMessage(e)))
+      .finally(() => setLoading(false));
   }, []);
   useEffect(load, [load]);
 
@@ -36,34 +42,38 @@ export default function Approvals() {
       {error && <div className="alert error">{error}</div>}
 
       <div className="panel">
-        <table className="grid">
-          <thead>
-            <tr>
-              <th>PO</th><th>Division</th><th>Section</th><th>Supplier</th><th>By</th>
-              <th className="num">Value</th><th>Level</th><th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {queue.map((q) => (
-              <tr key={q.instance_id}>
-                <td><Link className="mono" to={`/purchase-orders/${q.po_id}`}>{q.po_number}</Link></td>
-                <td>{q.division_name}</td>
-                <td>{q.section_name}</td>
-                <td>{q.supplier_name}</td>
-                <td>{q.created_by_name}</td>
-                <td className="num"><Money value={q.grand_total} /></td>
-                <td>L{q.current_level}{q.approver_role_code ? ` · ${q.approver_role_code}` : ' · exception'}</td>
-                <td style={{ whiteSpace: 'nowrap' }}>
-                  <button className="btn sm ok" onClick={() => openAction(q.po_id, q.po_number, 'approved')}>Approve</button>{' '}
-                  <button className="btn sm danger" onClick={() => openAction(q.po_id, q.po_number, 'rejected')}>Reject</button>{' '}
-                  <button className="btn sm" onClick={() => openAction(q.po_id, q.po_number, 'send_back')}>Send Back</button>{' '}
-                  <button className="btn sm" onClick={() => openAction(q.po_id, q.po_number, 'hold')}>Hold</button>
-                </td>
+        {loading && !queue.length ? (
+          <TableSkeleton rows={5} columns={8} />
+        ) : (
+          <table className="grid">
+            <thead>
+              <tr>
+                <th>PO</th><th>Division</th><th>Section</th><th>Supplier</th><th>By</th>
+                <th className="num">Value</th><th>Level</th><th>Actions</th>
               </tr>
-            ))}
-            {!queue.length && <tr><td colSpan={8} className="muted">Queue is clear — nothing awaiting your decision.</td></tr>}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {queue.map((q) => (
+                <tr key={q.instance_id}>
+                  <td><Link className="mono" to={`/purchase-orders/${q.po_id}`}>{q.po_number}</Link></td>
+                  <td>{q.division_name}</td>
+                  <td>{q.section_name}</td>
+                  <td>{q.supplier_name}</td>
+                  <td>{q.created_by_name}</td>
+                  <td className="num"><Money value={q.grand_total} /></td>
+                  <td>L{q.current_level}{q.approver_role_code ? ` · ${q.approver_role_code}` : ' · exception'}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    <button className="btn sm ok" onClick={() => openAction(q.po_id, q.po_number, 'approved')}>Approve</button>{' '}
+                    <button className="btn sm danger" onClick={() => openAction(q.po_id, q.po_number, 'rejected')}>Reject</button>{' '}
+                    <button className="btn sm" onClick={() => openAction(q.po_id, q.po_number, 'send_back')}>Send Back</button>{' '}
+                    <button className="btn sm" onClick={() => openAction(q.po_id, q.po_number, 'hold')}>Hold</button>
+                  </td>
+                </tr>
+              ))}
+              {!queue.length && <tr><td colSpan={8} className="muted" style={{ textAlign: 'center', padding: '24px 0' }}>Queue is clear — nothing awaiting your decision.</td></tr>}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {acting && (

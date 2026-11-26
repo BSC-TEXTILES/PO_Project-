@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import api from '../../api.js';
 import Icon from '../../components/Icon.jsx';
 import { useAuth } from '../../auth.jsx';
+import { CardSkeleton, FormSkeleton } from '../../components/Skeletons.jsx';
 
 export default function LRGoodsReceiving() {
   const { user } = useAuth();
@@ -136,7 +137,7 @@ export default function LRGoodsReceiving() {
           </h3>
 
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '30px 0', color: '#94a3b8' }}>Loading...</div>
+            <CardSkeleton count={4} height={90} />
           ) : pendingShipments.length === 0 ? (
             <p style={{ color: '#94a3b8', fontSize: '13px' }}>All registered shipments have been received and verified.</p>
           ) : (

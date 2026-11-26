@@ -1,16 +1,22 @@
 import { Fragment, useEffect, useState } from 'react';
 import api, { errMessage } from '../api.js';
+import { TableSkeleton } from '../components/Skeletons.jsx';
 
 export default function AuditLogs() {
   const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({ actionType: '', entityType: '', from: '', to: '' });
   const [error, setError] = useState('');
   const [expanded, setExpanded] = useState(null);
 
   useEffect(() => {
+    setLoading(true);
     const params = {};
     Object.entries(filters).forEach(([k, v]) => { if (v) params[k] = v; });
-    api.get('/audit-logs', { params }).then((r) => setRows(r.data.data || [])).catch((e) => setError(errMessage(e)));
+    api.get('/audit-logs', { params })
+      .then((r) => setRows(r.data.data || []))
+      .catch((e) => setError(errMessage(e)))
+      .finally(() => setLoading(false));
   }, [filters]);
 
   return (
@@ -35,37 +41,41 @@ export default function AuditLogs() {
           </label>
         </div>
 
-        <table className="grid">
-          <thead>
-            <tr><th>When</th><th>Actor</th><th>Role</th><th>Action</th><th>Entity</th><th>Division</th><th></th></tr>
-          </thead>
-          <tbody>
-            {rows.map((a) => (
-              <Fragment key={a.id}>
-                <tr className="clickable" onClick={() => setExpanded(expanded === a.id ? null : a.id)}>
-                  <td className="mono">{new Date(a.occurred_at).toLocaleString('en-IN')}</td>
-                  <td>{a.user_name || 'System'}</td>
-                  <td className="muted">{a.user_role}</td>
-                  <td><strong>{a.action_type}</strong></td>
-                  <td>{a.entity_type}</td>
-                  <td>{a.division_code || '—'}</td>
-                  <td>{a.before_value || a.after_value ? '▸' : ''}</td>
-                </tr>
-                {expanded === a.id && (
-                  <tr key={`${a.id}-x`}><td colSpan={7} style={{ background: '#0f172a' }}>
-                    <div className="json-box">
-                      {a.before_value && <div>BEFORE: {(() => { try { return JSON.stringify(typeof a.before_value === 'string' ? JSON.parse(a.before_value) : a.before_value, null, 2); } catch { return String(a.before_value); } })()}</div>}
-                      {a.after_value && <div>AFTER: {(() => { try { return JSON.stringify(typeof a.after_value === 'string' ? JSON.parse(a.after_value) : a.after_value, null, 2); } catch { return String(a.after_value); } })()}</div>}
-                      {a.reason && <div>REASON: {a.reason}</div>}
-                      {!a.before_value && !a.after_value && <div>no value diff</div>}
-                    </div>
-                  </td></tr>
-                )}
-              </Fragment>
-            ))}
-            {!rows.length && <tr><td colSpan={7} className="muted">No audit events match.</td></tr>}
-          </tbody>
-        </table>
+        {loading && !rows.length ? (
+          <TableSkeleton rows={8} columns={7} />
+        ) : (
+          <table className="grid">
+            <thead>
+              <tr><th>When</th><th>Actor</th><th>Role</th><th>Action</th><th>Entity</th><th>Division</th><th></th></tr>
+            </thead>
+            <tbody>
+              {rows.map((a) => (
+                <Fragment key={a.id}>
+                  <tr className="clickable" onClick={() => setExpanded(expanded === a.id ? null : a.id)}>
+                    <td className="mono">{new Date(a.occurred_at).toLocaleString('en-IN')}</td>
+                    <td>{a.user_name || 'System'}</td>
+                    <td className="muted">{a.user_role}</td>
+                    <td><strong>{a.action_type}</strong></td>
+                    <td>{a.entity_type}</td>
+                    <td>{a.division_code || '—'}</td>
+                    <td>{a.before_value || a.after_value ? '▸' : ''}</td>
+                  </tr>
+                  {expanded === a.id && (
+                    <tr key={`${a.id}-x`}><td colSpan={7} style={{ background: '#0f172a' }}>
+                      <div className="json-box">
+                        {a.before_value && <div>BEFORE: {(() => { try { return JSON.stringify(typeof a.before_value === 'string' ? JSON.parse(a.before_value) : a.before_value, null, 2); } catch { return String(a.before_value); } })()}</div>}
+                        {a.after_value && <div>AFTER: {(() => { try { return JSON.stringify(typeof a.after_value === 'string' ? JSON.parse(a.after_value) : a.after_value, null, 2); } catch { return String(a.after_value); } })()}</div>}
+                        {a.reason && <div>REASON: {a.reason}</div>}
+                        {!a.before_value && !a.after_value && <div>no value diff</div>}
+                      </div>
+                    </td></tr>
+                  )}
+                </Fragment>
+              ))}
+              {!rows.length && <tr><td colSpan={7} className="muted" style={{ textAlign: 'center', padding: '24px 0' }}>No audit events match.</td></tr>}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api.js';
 import Icon from '../../components/Icon.jsx';
+import { FormSkeleton } from '../../components/Skeletons.jsx';
 
 export default function LRUpload() {
   const navigate = useNavigate();
@@ -200,12 +201,15 @@ export default function LRUpload() {
         </div>
 
         {uploading && (
-          <div style={{ textAlign: 'center', padding: '24px', background: '#eff6ff', borderRadius: '10px', border: '1px solid #bfdbfe' }}>
-            <div className="login-spinner" style={{ margin: '0 auto 12px' }} />
-            <div style={{ fontWeight: 700, color: '#1e40af', fontSize: '15px' }}>Processing Document with OCR & AI...</div>
-            <div style={{ color: '#64748b', fontSize: '13px', marginTop: '4px' }}>
-              Detecting transporter, extracting LR tracking numbers, and validating invoice milestones.
+          <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ textAlign: 'center', padding: '24px', background: '#eff6ff', borderRadius: '10px', border: '1px solid #bfdbfe' }}>
+              <div className="login-spinner" style={{ margin: '0 auto 12px' }} />
+              <div style={{ fontWeight: 700, color: '#1e40af', fontSize: '15px' }}>Processing Document with OCR & AI...</div>
+              <div style={{ color: '#64748b', fontSize: '13px', marginTop: '4px' }}>
+                Detecting transporter, extracting LR tracking numbers, and validating invoice milestones.
+              </div>
             </div>
+            <FormSkeleton fields={8} />
           </div>
         )}
       </div>

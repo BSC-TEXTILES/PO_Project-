@@ -4,6 +4,7 @@ import api, { errMessage } from '../api.js';
 import { useAuth } from '../auth.jsx';
 import { Money } from '../components/DataTable.jsx';
 import Icon from '../components/Icon.jsx';
+import { DashboardSkeleton } from '../components/Skeletons.jsx';
 
 // Compact INR for chart labels: ₹2.65L / ₹1.2Cr / ₹45,200
 function inrCompact(n) {
@@ -79,7 +80,7 @@ export default function BrandWiseDashboard() {
     return () => { active = false; };
   }, []);
 
-  if (loading) return <div className="loading"><div className="loading-spinner" /></div>;
+  if (loading && !data) return <DashboardSkeleton />;
   if (error) return <div className="page"><div className="alert error">{error}</div></div>;
   if (!data) return <div className="page"><div className="muted">No data available</div></div>;
 

@@ -7,6 +7,7 @@ import Modal from '../components/Modal.jsx';
 import Icon from '../components/Icon.jsx';
 import ShareMenu from '../components/ShareMenu.jsx';
 import { Money } from '../components/DataTable.jsx';
+import { PageSkeleton } from '../components/Skeletons.jsx';
 
 // Universal attachment drawer for a PO — PDF, Excel, Word, images, video, any
 // format up to 200 MB. Anyone in the division can attach; uploader/approver/SA
@@ -169,7 +170,7 @@ export default function PODetails() {
   }
 
   if (error && !po) return <div className="page"><div className="alert error">{error}</div></div>;
-  if (!po) return <div className="page"><p className="muted">Loading…</p></div>;
+  if (!po) return <PageSkeleton title="Loading Purchase Order Details…" />;
 
   const qtyDisplay = (q) => Object.values(q || {}).map((x) => `${x.sizeLabel}:${x.quantity}`).join(' · ');
   const canAct = ['submitted', 'under_review'].includes(po.status) && hasPermission('approvals.act');

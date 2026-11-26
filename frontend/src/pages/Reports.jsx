@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import api, { errMessage } from '../api.js';
+import { TableSkeleton, ChartSkeleton } from '../components/Skeletons.jsx';
 
 const REPORTS = [
   { key: 'po-register', label: 'PO Register' },
@@ -107,7 +108,14 @@ export default function Reports() {
           {result && result.data.length > 0 && <button className="btn" onClick={() => window.print()}>🖨 Print</button>}
         </div>
 
-        {result && (
+        {busy && (
+          <div className="mt" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <ChartSkeleton height={260} />
+            <TableSkeleton rows={6} columns={6} />
+          </div>
+        )}
+
+        {!busy && result && (
           <div className="mt" id="report-print-area">
             {result.data.length === 0 && <p className="muted">No rows for the selected range.</p>}
             {result.data.length > 0 && (

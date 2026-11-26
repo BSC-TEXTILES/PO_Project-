@@ -5,6 +5,7 @@ import { useAuth } from '../auth.jsx';
 import { Money } from '../components/DataTable.jsx';
 import StatusChip from '../components/StatusChip.jsx';
 import Icon from '../components/Icon.jsx';
+import { PageSkeleton } from '../components/Skeletons.jsx';
 
 function dmy(value) {
   if (!value) return '';
@@ -40,7 +41,7 @@ export default function BrandWiseDetail() {
 
   useEffect(load, [load]);
 
-  if (loading) return <div className="loading"><div className="loading-spinner" /></div>;
+  if (loading && !data) return <PageSkeleton title="Loading Brand POs…" />;
   if (error) return <div className="page"><div className="alert error">{error}</div></div>;
   if (!data) return <div className="page"><div className="muted">No data available</div></div>;
 

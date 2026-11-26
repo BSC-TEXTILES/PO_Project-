@@ -14,46 +14,91 @@ export default class ErrorBoundary extends React.Component {
     console.error('POMS Application Error:', error, errorInfo);
   }
 
+  handleRetry = () => {
+    this.setState({ hasError: false, error: null });
+    if (this.props.onRetry) {
+      this.props.onRetry();
+    } else {
+      window.location.reload();
+    }
+  };
+
   handleReset = () => {
-    // Session may be invalid — redirect to login
     window.location.href = '/login';
   };
 
   render() {
     if (this.state.hasError) {
+      if (this.props.inline) {
+        return (
+          <div className="card" style={{
+            background: '#fff1f2',
+            border: '1px solid #fecdd3',
+            borderRadius: '12px',
+            padding: '20px',
+            textAlign: 'center',
+            margin: '12px 0',
+          }}>
+            <div style={{ color: '#be123c', fontWeight: 600, fontSize: '15px', marginBottom: '8px' }}>
+              ⚠️ Unable to display this section
+            </div>
+            <p style={{ color: '#881337', fontSize: '13px', margin: '0 0 14px' }}>
+              {this.state.error?.message || 'A rendering error occurred in this module.'}
+            </p>
+            <button
+              onClick={this.handleRetry}
+              className="btn sm"
+              style={{ background: '#be123c', color: '#fff', border: 'none', borderRadius: '6px' }}
+            >
+              Retry Section
+            </button>
+          </div>
+        );
+      }
+
       return (
         <div style={{
-          minHeight: '100vh',
+          minHeight: '80vh',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: '#0b1a2e',
-          color: '#f8fafc',
-          fontFamily: 'Segoe UI, system-ui, sans-serif',
+          background: 'var(--bg, #f8fafc)',
+          color: 'var(--ink, #0f172a)',
           padding: '24px',
         }}>
-          <div style={{
-            background: '#132338',
-            border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: '16px',
+          <div className="card" style={{
             maxWidth: '520px',
             width: '100%',
             padding: '36px 30px',
-            boxShadow: '0 24px 60px rgba(0,0,0,0.5)',
+            boxShadow: 'var(--elevation-3)',
             textAlign: 'center',
+            borderRadius: '16px',
+            border: '1px solid var(--line, #e2e8f0)',
           }}>
-            <div style={{ fontSize: '42px', marginBottom: '16px' }}>⚠️</div>
-            <h2 style={{ fontSize: '22px', margin: '0 0 8px', color: '#fff' }}>
-              Something went wrong
+            <div style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '50%',
+              background: '#fee2e2',
+              color: '#dc2626',
+              display: 'grid',
+              placeItems: 'center',
+              fontSize: '26px',
+              margin: '0 auto 16px',
+            }}>
+              ⚠️
+            </div>
+            <h2 style={{ fontSize: '20px', fontWeight: 700, margin: '0 0 8px', color: '#0f172a' }}>
+              {this.props.title || 'Something went wrong'}
             </h2>
-            <p style={{ color: '#94a3b8', fontSize: '14px', lineHeight: '1.6', margin: '0 0 24px' }}>
-              An unexpected error occurred while rendering the page. Click below to reload or reset your session.
+            <p style={{ color: '#64748b', fontSize: '14px', lineHeight: '1.6', margin: '0 0 20px' }}>
+              An unexpected error occurred while rendering this page. You can try refreshing or resetting your active session.
             </p>
             {this.state.error?.message && (
               <div style={{
-                background: 'rgba(220, 38, 38, 0.15)',
-                border: '1px solid rgba(220, 38, 38, 0.3)',
-                color: '#fca5a5',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                color: '#dc2626',
                 padding: '10px 14px',
                 borderRadius: '8px',
                 fontSize: '12.5px',
@@ -67,15 +112,12 @@ export default class ErrorBoundary extends React.Component {
             )}
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
               <button
-                onClick={() => window.location.reload()}
+                onClick={this.handleRetry}
+                className="btn primary"
                 style={{
-                  background: '#b98a2f',
-                  color: '#fff',
-                  border: 'none',
                   padding: '10px 20px',
                   borderRadius: '8px',
                   fontWeight: 600,
-                  cursor: 'pointer',
                   fontSize: '13.5px',
                 }}
               >
@@ -83,14 +125,11 @@ export default class ErrorBoundary extends React.Component {
               </button>
               <button
                 onClick={this.handleReset}
+                className="btn"
                 style={{
-                  background: 'rgba(255,255,255,0.08)',
-                  color: '#e2e8f0',
-                  border: '1px solid rgba(255,255,255,0.15)',
                   padding: '10px 20px',
                   borderRadius: '8px',
                   fontWeight: 500,
-                  cursor: 'pointer',
                   fontSize: '13.5px',
                 }}
               >

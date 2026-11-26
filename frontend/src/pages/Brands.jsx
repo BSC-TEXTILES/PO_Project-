@@ -5,6 +5,7 @@ import { useAuth } from '../auth.jsx';
 import Icon from '../components/Icon.jsx';
 import Modal from '../components/Modal.jsx';
 import CSVImportModal from '../components/CSVImportModal.jsx';
+import { CardSkeleton } from '../components/Skeletons.jsx';
 
 export default function Brands() {
   const { user, hasPermission } = useAuth();
@@ -17,6 +18,7 @@ export default function Brands() {
   const [sections, setSections] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('');
   const [sectionFilterLocal, setSectionFilterLocal] = useState('');
@@ -39,13 +41,15 @@ export default function Brands() {
   }, [sections, form.departmentId]);
 
   const load = () => {
+    setLoading(true);
     const params = { page, limit: 20, search };
     if (sectionFilter) params.sectionId = sectionFilter;
     else if (sectionFilterLocal) params.sectionId = sectionFilterLocal;
     else if (departmentFilter) params.departmentId = departmentFilter;
     api.get('/brands', { params })
       .then((r) => { setRows(r.data.data || []); setTotal(r.data.total || 0); })
-      .catch((e) => setError(errMessage(e)));
+      .catch((e) => setError(errMessage(e)))
+      .finally(() => setLoading(false));
   };
   useEffect(load, [page, search, departmentFilter, sectionFilterLocal, sectionFilter, sections]);
   useEffect(() => {
@@ -164,9 +168,12 @@ export default function Brands() {
             </label>
           )}
         </div>
-        <div className="brands-grid">
-          {rows.map((b) => (
-            <div className="brand-card" key={b.id}>
+        {loading && !rows.length ? (
+          <CardSkeleton count={8} height={130} />
+        ) : (
+          <div className="brands-grid">
+            {rows.map((b) => (
+              <div className="brand-card" key={b.id}>
               <div
                 className="brand-card-logo"
                 onClick={() => { if (isAdmin) fileRef.current[b.id]?.click(); }}
@@ -228,6 +235,7 @@ export default function Brands() {
           ))}
           {!rows.length && <div className="brands-empty">No brands found</div>}
         </div>
+        )}
       </div>
       {modal && (
         <Modal title={modal === 'create' ? 'Add Brand' : 'Edit Brand'} onClose={() => setModal(null)}>

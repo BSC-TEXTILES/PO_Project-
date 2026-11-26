@@ -7,6 +7,7 @@ import Icon from '../components/Icon.jsx';
 import CSVImportModal from '../components/CSVImportModal.jsx';
 import { useAuth } from '../auth.jsx';
 import { useDebounce } from '../hooks/useDebounce.js';
+import { TableSkeleton, CardSkeleton } from '../components/Skeletons.jsx';
 
 const PO_STATUSES = ['draft', 'submitted', 'under_review', 'approved', 'issued', 'partially_received', 'received', 'closed'];
 
@@ -55,6 +56,7 @@ export default function POList() {
   const [notice, setNotice] = useState('');
   const [showCsvModal, setShowCsvModal] = useState(false);
   const [kpis, setKpis] = useState(null);
+  const [loading, setLoading] = useState(true);
   const pageSize = 20;
 
   // Debounce search input to avoid excessive API calls
@@ -73,13 +75,15 @@ export default function POList() {
   }, []);
 
   const loadData = useCallback(() => {
+    setLoading(true);
     const params = { page, pageSize };
     // Use debounced search for API calls, but keep immediate filters for other fields
     const apiFilters = { ...filters, search: debouncedSearch };
     Object.entries(apiFilters).forEach(([k, v]) => { if (v) params[k] = v; });
     api.get('/purchase-orders', { params })
       .then((r) => { setRows(r.data.data || []); setTotal(r.data.total || 0); setError(''); })
-      .catch((e) => setError(errMessage(e)));
+      .catch((e) => setError(errMessage(e)))
+      .finally(() => setLoading(false));
   }, [page, filters, debouncedSearch]);
 
   useEffect(() => {
@@ -201,23 +205,27 @@ export default function POList() {
       </div>
 
       {/* ---------- KPI cards — status groups in scope (Donezo reference) ---------- */}
-      <div className="donezo-kpis">
-        <button type="button" className={`donezo-stat-card polist-card kpi-green${!filters.status ? ' active' : ''}`} onClick={() => applyStatus('')} title="Show all orders">
-          <div className="st-head"><span>Total Orders</span> <div className="st-arrow">↗</div></div>
-          <div className="st-val">{kpis ? kpis.total : '…'}</div>
-          <div className="st-note"><span className="st-up">↗</span> All statuses · authorized scope</div>
-        </button>
-        {KPI_CARDS.map((card) => (
-          <button type="button" key={card.key}
-            className={`donezo-stat-card polist-card${filters.status === card.apply ? ' active' : ''}`}
-            onClick={() => applyStatus(filters.status === card.apply ? '' : card.apply)}
-            title={`Show ${card.title.toLowerCase()} orders`}>
-            <div className="st-head"><span>{card.title}</span> <div className="st-arrow">↗</div></div>
-            <div className="st-val">{kpis ? kpis[card.key] : '…'}</div>
-            <div className="st-note"><span className="st-up">↑</span> {card.note}</div>
+      {!kpis ? (
+        <CardSkeleton count={4} height={85} />
+      ) : (
+        <div className="donezo-kpis">
+          <button type="button" className={`donezo-stat-card polist-card kpi-green${!filters.status ? ' active' : ''}`} onClick={() => applyStatus('')} title="Show all orders">
+            <div className="st-head"><span>Total Orders</span> <div className="st-arrow">↗</div></div>
+            <div className="st-val">{kpis ? kpis.total : '…'}</div>
+            <div className="st-note"><span className="st-up">↗</span> All statuses · authorized scope</div>
           </button>
-        ))}
-      </div>
+          {KPI_CARDS.map((card) => (
+            <button type="button" key={card.key}
+              className={`donezo-stat-card polist-card${filters.status === card.apply ? ' active' : ''}`}
+              onClick={() => applyStatus(filters.status === card.apply ? '' : card.apply)}
+              title={`Show ${card.title.toLowerCase()} orders`}>
+              <div className="st-head"><span>{card.title}</span> <div className="st-arrow">↗</div></div>
+              <div className="st-val">{kpis ? kpis[card.key] : '…'}</div>
+              <div className="st-note"><span className="st-up">↑</span> {card.note}</div>
+            </button>
+          ))}
+        </div>
+      )}
 
       {notice && <div className="alert ok">{notice}</div>}
       {error && <div className="alert error">{error}</div>}
@@ -280,73 +288,77 @@ export default function POList() {
       </div>
 
       {/* ---------- Register table ---------- */}
-      <div className="panel polist-table-card">
-        <div className="polist-table-head">
-          <div>
-            <div className="polist-table-title">Purchase Order Register</div>
-            <div className="polist-table-sub">
-              {total} {total === 1 ? 'order' : 'orders'} {hasActiveFilters ? 'match the active filters' : 'in your authorized scope'}
+      {loading && !rows.length ? (
+        <TableSkeleton rows={8} columns={9} />
+      ) : (
+        <div className="panel polist-table-card">
+          <div className="polist-table-head">
+            <div>
+              <div className="polist-table-title">Purchase Order Register</div>
+              <div className="polist-table-sub">
+                {total} {total === 1 ? 'order' : 'orders'} {hasActiveFilters ? 'match the active filters' : 'in your authorized scope'}
+              </div>
             </div>
+            {hasActiveFilters && (
+              <div className="polist-chips">
+                {activeChips.map((chip) => (
+                  <span className="polist-chip" key={chip.key}>
+                    {chip.label}
+                    <button onClick={chip.clear} title="Remove this filter"><Icon name="x" size={11} /></button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
-          {hasActiveFilters && (
-            <div className="polist-chips">
-              {activeChips.map((chip) => (
-                <span className="polist-chip" key={chip.key}>
-                  {chip.label}
-                  <button onClick={chip.clear} title="Remove this filter"><Icon name="x" size={11} /></button>
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
 
-        <div className="table-responsive">
-          <table className="grid polist-table">
-            <thead>
-              <tr>
-                <th>PO Number</th><th>Date</th><th>Version</th><th>Status</th>
-                <th>Supplier</th><th>Department</th><th>Section</th><th className="num">Qty</th><th className="num">Grand Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((p) => (
-                <tr key={p.id} className="clickable" onClick={() => navigate(`/purchase-orders/${p.id}`)}>
-                  <td className="mono"><span className="po-no">{p.po_number}</span></td>
-                  <td>{new Date(p.po_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
-                  <td><span className="chip">v{p.version}</span></td>
-                  <td><StatusChip status={p.status} /></td>
-                  <td><span className="cell-strong" title={p.supplier_name}>{p.supplier_name}</span></td>
-                  <td title={p.department_name}>{p.department_name}</td>
-                  <td title={p.section_name}>{p.section_name}</td>
-                  <td className="num">{p.total_quantity}</td>
-                  <td className="num"><Money value={p.grand_total} /></td>
-                </tr>
-              ))}
-              {!rows.length && (
+          <div className="table-responsive">
+            <table className="grid polist-table">
+              <thead>
                 <tr>
-                  <td colSpan={9}>
-                    <div className="polist-empty">
-                      <Icon name="search" size={30} />
-                      <span>{hasActiveFilters ? 'No purchase orders match the active filters.' : 'No purchase orders in your authorized scope yet.'}</span>
-                      {hasActiveFilters && (
-                        <button className="btn ghost sm" onClick={resetFilters}><Icon name="rotateCw" size={13} /> Reset filters</button>
-                      )}
-                    </div>
-                  </td>
+                  <th>PO Number</th><th>Date</th><th>Version</th><th>Status</th>
+                  <th>Supplier</th><th>Department</th><th>Section</th><th className="num">Qty</th><th className="num">Grand Total</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {rows.map((p) => (
+                  <tr key={p.id} className="clickable" onClick={() => navigate(`/purchase-orders/${p.id}`)}>
+                    <td className="mono"><span className="po-no">{p.po_number}</span></td>
+                    <td>{new Date(p.po_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+                    <td><span className="chip">v{p.version}</span></td>
+                    <td><StatusChip status={p.status} /></td>
+                    <td><span className="cell-strong" title={p.supplier_name}>{p.supplier_name}</span></td>
+                    <td title={p.department_name}>{p.department_name}</td>
+                    <td title={p.section_name}>{p.section_name}</td>
+                    <td className="num">{p.total_quantity}</td>
+                    <td className="num"><Money value={p.grand_total} /></td>
+                  </tr>
+                ))}
+                {!rows.length && (
+                  <tr>
+                    <td colSpan={9}>
+                      <div className="polist-empty">
+                        <Icon name="search" size={30} />
+                        <span>{hasActiveFilters ? 'No purchase orders match the active filters.' : 'No purchase orders in your authorized scope yet.'}</span>
+                        {hasActiveFilters && (
+                          <button className="btn ghost sm" onClick={resetFilters}><Icon name="rotateCw" size={13} /> Reset filters</button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
 
-        <div className="polist-pager">
-          <span className="polist-pager-info">Page {page} of {pages} · showing {rows.length} of {total}</span>
-          <div className="polist-pager-btns">
-            <button className="btn sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>← Prev</button>
-            <button className="btn sm" disabled={page >= pages} onClick={() => setPage(page + 1)}>Next →</button>
+          <div className="polist-pager">
+            <span className="polist-pager-info">Page {page} of {pages} · showing {rows.length} of {total}</span>
+            <div className="polist-pager-btns">
+              <button className="btn sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>← Prev</button>
+              <button className="btn sm" disabled={page >= pages} onClick={() => setPage(page + 1)}>Next →</button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import api, { errMessage } from '../api.js';
 import { useAuth } from '../auth.jsx';
 import { Money } from '../components/DataTable.jsx';
 import Icon from '../components/Icon.jsx';
+import { DashboardSkeleton } from '../components/Skeletons.jsx';
 
 function fmtTime(d) {
   if (!d) return '';
@@ -255,6 +256,7 @@ function SupervisorDashboard() {
       .then((r) => setData(r.data))
       .catch((e) => setError(errMessage(e)));
   }, []);
+  if (!data && !error) return <DashboardSkeleton />;
   const t = data?.totals;
   const fmt = (v) => '₹' + Number(v || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return (
@@ -306,6 +308,7 @@ export default function Dashboard() {
 }
 
 function MainDashboard() {
+  const navigate = useNavigate();
   const { user, hasPermission, selectedSectionId, clearSection, selectedLocation, clearLocation } = useAuth();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -379,9 +382,20 @@ function MainDashboard() {
     return () => { active = false; };
   }, [selectedSectionId, selectedLocation]);
 
-  if (loading) return <div className="loading"><div className="loading-spinner" /></div>;
-  if (error) return <div className="alert error">{error}</div>;
-  if (!dashData) return <div className="muted">No data available</div>;
+  if (loading && !dashData) return <DashboardSkeleton />;
+  if (error && !dashData) {
+    return (
+      <div className="page" style={{ padding: '24px' }}>
+        <div className="card" style={{ maxWidth: 500, margin: '40px auto', textAlign: 'center', padding: 32, borderRadius: 16 }}>
+          <div style={{ fontSize: 36, marginBottom: 12 }}>⚠️</div>
+          <h3 style={{ margin: '0 0 8px', color: '#dc2626' }}>Failed to load dashboard metrics</h3>
+          <p style={{ color: '#64748b', fontSize: 13, marginBottom: 20 }}>{error}</p>
+          <button className="btn primary" onClick={() => window.location.reload()}>Retry</button>
+        </div>
+      </div>
+    );
+  }
+  if (!dashData) return <div className="muted" style={{ padding: 24 }}>No data available</div>;
 
   const {
     kpis = {}, byDivision = [], byStatus = [], bySection = [], bySupplier = [], recentAudit = [],
@@ -485,6 +499,50 @@ function MainDashboard() {
           <div className="st-val">{refreshing ? <span className="kpi-skeleton">…</span> : (workProgress.drafts || 0)}</div>
           <div className="st-note">Drafts awaiting submission</div>
         </Link>
+      </div>
+
+      {/* Location-Wise Store Comparison (Belagavi, Davanagere, Shivamogga) */}
+      <div className="card" style={{ marginBottom: 24, padding: '20px 22px', borderRadius: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>Store Branch Performance</h3>
+            <span style={{ fontSize: 12, color: 'var(--muted)' }}>Live order distribution across Belagavi, Davanagere, and Shivamogga stores</span>
+          </div>
+          <Link to="/lr-tracking" className="btn sm" style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600 }}>
+            <Icon name="truck" size={14} /> LR Tracking Hub →
+          </Link>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
+          {(byDivision.length ? byDivision : [
+            { code: 'BEL', name: 'Belagavi Store', pos: 0, value: 0 },
+            { code: 'DAV', name: 'Davanagere Store', pos: 0, value: 0 },
+            { code: 'SHI', name: 'Shivamogga Store', pos: 0, value: 0 }
+          ]).map((div) => (
+            <div
+              key={div.code || div.name}
+              className="card clickable"
+              onClick={() => navigate(`/purchase-orders?search=${encodeURIComponent(div.code || div.name)}`)}
+              style={{
+                padding: '16px 18px',
+                borderRadius: 12,
+                border: '1px solid #e2e8f0',
+                background: '#f8fafc',
+                cursor: 'pointer',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 6
+              }}
+              title={`Click to filter purchase orders for ${div.name}`}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 700, fontSize: 13, color: '#1e40af' }}>{div.name}</span>
+                <span className="chip" style={{ fontSize: 11, fontWeight: 700, background: '#dbeafe', color: '#1d4ed8' }}>{div.code || 'STORE'}</span>
+              </div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink)' }}>{div.pos} <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--muted)' }}>orders</span></div>
+              <div style={{ fontSize: 12, color: '#059669', fontWeight: 600 }}>Total: {inrCompact(div.value)}</div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Quick Actions — permission-aware shortcut tiles */}

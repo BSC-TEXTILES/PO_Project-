@@ -3,9 +3,11 @@ import { Link } from 'react-router-dom';
 import api, { errMessage } from '../api.js';
 import StatusChip from '../components/StatusChip.jsx';
 import Modal from '../components/Modal.jsx';
+import { TableSkeleton } from '../components/Skeletons.jsx';
 
 export default function Receipts() {
   const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [creating, setCreating] = useState(false);
   const [openPOs, setOpenPOs] = useState([]);
@@ -15,7 +17,11 @@ export default function Receipts() {
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(() => {
-    api.get('/receipts').then((r) => setRows(r.data.data || [])).catch((e) => setError(errMessage(e)));
+    setLoading(true);
+    api.get('/receipts')
+      .then((r) => setRows(r.data.data || []))
+      .catch((e) => setError(errMessage(e)))
+      .finally(() => setLoading(false));
   }, []);
   useEffect(load, [load]);
 
@@ -65,24 +71,28 @@ export default function Receipts() {
         <div className="row" style={{ marginBottom: 12 }}>
           <button className="btn primary" onClick={openCreate}>+ New Receipt</button>
         </div>
-        <table className="grid">
-          <thead><tr><th>Receipt</th><th>PO</th><th>Supplier</th><th>Delivery date</th><th>Invoice</th><th>Status</th><th className="num">Accepted qty</th><th>By</th></tr></thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.id}>
-                <td className="mono">{r.receipt_number}</td>
-                <td><Link className="mono" to={`/purchase-orders/${r.po_id}`}>{r.po_number}</Link></td>
-                <td>{r.supplier_name}</td>
-                <td>{r.delivery_date ? new Date(r.delivery_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
-                <td>{r.invoice_number || '—'}</td>
-                <td><StatusChip status={r.status} /></td>
-                <td className="num">{r.accepted_total}</td>
-                <td>{r.received_by_name}</td>
-              </tr>
-            ))}
-            {!rows.length && <tr><td colSpan={8} className="muted">No receipts recorded yet.</td></tr>}
-          </tbody>
-        </table>
+        {loading && !rows.length ? (
+          <TableSkeleton rows={6} columns={8} />
+        ) : (
+          <table className="grid">
+            <thead><tr><th>Receipt</th><th>PO</th><th>Supplier</th><th>Delivery date</th><th>Invoice</th><th>Status</th><th className="num">Accepted qty</th><th>By</th></tr></thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id}>
+                  <td className="mono">{r.receipt_number}</td>
+                  <td><Link className="mono" to={`/purchase-orders/${r.po_id}`}>{r.po_number}</Link></td>
+                  <td>{r.supplier_name}</td>
+                  <td>{r.delivery_date ? new Date(r.delivery_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
+                  <td>{r.invoice_number || '—'}</td>
+                  <td><StatusChip status={r.status} /></td>
+                  <td className="num">{r.accepted_total}</td>
+                  <td>{r.received_by_name}</td>
+                </tr>
+              ))}
+              {!rows.length && <tr><td colSpan={8} className="muted" style={{ textAlign: 'center', padding: '24px 0' }}>No receipts recorded yet.</td></tr>}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {creating && (

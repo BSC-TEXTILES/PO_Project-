@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import api, { errMessage } from '../api.js';
 import { useAuth } from '../auth.jsx';
 import Modal from '../components/Modal.jsx';
+import { TableSkeleton } from '../components/Skeletons.jsx';
 
 const INR = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -11,6 +12,7 @@ export default function Products({ gender }) {
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
   const [brand, setBrand] = useState('');
@@ -22,6 +24,7 @@ export default function Products({ gender }) {
   const [deleteModal, setDeleteModal] = useState(null);
 
   const load = () => {
+    setLoading(true);
     const params = {
       page,
       limit: 20,
@@ -37,7 +40,8 @@ export default function Products({ gender }) {
     if (gender) params.gender = gender;
     api.get('/products', { params })
       .then((r) => { setRows(r.data.data || []); setTotal(r.data.total || 0); })
-      .catch((e) => setError(errMessage(e)));
+      .catch((e) => setError(errMessage(e)))
+      .finally(() => setLoading(false));
   };
   useEffect(load, [page, search, category, brand, status, sort, gender]);
   useEffect(() => {
@@ -93,42 +97,46 @@ export default function Products({ gender }) {
           </label>
         </div>
 
-        <table className="grid">
-          <thead><tr><th>Product</th><th>Category</th><th>Brand</th><th>Sizes</th><th>Colors</th><th>Purchase ₹</th><th>Selling ₹</th><th>Profit ₹</th><th>Margin</th><th>Status</th><th>Actions</th></tr></thead>
-          <tbody>
-            {displayedRows.map((p) => (
-              <tr key={p.id}>
-                <td>
-                  <Link to={`/products/${p.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                    <div className="product-cell">
-                      <div className="product-thumb">👕</div>
-                      <div><div className="product-name">{p.name}</div><div className="product-sku">SKU: {p.sku}</div></div>
-                    </div>
-                  </Link>
-                </td>
-                <td>{p.category_name || '—'}</td>
-                <td>{p.brand_name || '—'}</td>
-                <td><div className="tag-list">{(p.sizes || []).slice(0, 3).map((s, i) => <span key={i} className="tag" style={{ fontSize: 11 }}>{s.label || s}</span>)}{(p.sizes || []).length > 3 && <span className="tag" style={{ fontSize: 11 }}>+{p.sizes.length - 3}</span>}</div></td>
-                <td><div className="tag-list">{(p.colours || p.colors || []).slice(0, 2).map((c, i) => <span key={i} className="tag" style={{ fontSize: 11 }}>{c.name || c}</span>)}</div></td>
-                <td className="num">{INR(p.purchase_price)}</td>
-                <td className="num">{INR(p.selling_price)}</td>
-                <td className="num" style={{ color: Number(p.profit_amount) >= 0 ? '#10b981' : '#ef4444' }}>{INR(p.profit_amount)}</td>
-                <td className="num">{Number(p.profit_margin || 0).toFixed(1)}%</td>
-                <td><span className={`chip st-${p.status}`}>{p.status}</span></td>
-                <td>
-                  <Link to={`/products/${p.id}`} className="btn sm">View</Link>
-                  {(user?.isSuperAdmin || user?.permissions?.includes('products.edit')) && (
-                    <> <Link to={`/products/${p.id}/edit`} className="btn sm">Edit</Link></>
-                  )}
-                  {(user?.isSuperAdmin || user?.permissions?.includes('products.delete')) && (
-                    <> <button className="btn sm danger" onClick={() => setDeleteModal(p)}>Archive</button></>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {!displayedRows.length && <tr><td colSpan={11} style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>No products found</td></tr>}
-          </tbody>
-        </table>
+        {loading && !rows.length ? (
+          <TableSkeleton rows={8} columns={10} />
+        ) : (
+          <table className="grid">
+            <thead><tr><th>Product</th><th>Category</th><th>Brand</th><th>Sizes</th><th>Colors</th><th>Purchase ₹</th><th>Selling ₹</th><th>Profit ₹</th><th>Margin</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+              {displayedRows.map((p) => (
+                <tr key={p.id}>
+                  <td>
+                    <Link to={`/products/${p.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                      <div className="product-cell">
+                        <div className="product-thumb">👕</div>
+                        <div><div className="product-name">{p.name}</div><div className="product-sku">SKU: {p.sku}</div></div>
+                      </div>
+                    </Link>
+                  </td>
+                  <td>{p.category_name || '—'}</td>
+                  <td>{p.brand_name || '—'}</td>
+                  <td><div className="tag-list">{(p.sizes || []).slice(0, 3).map((s, i) => <span key={i} className="tag" style={{ fontSize: 11 }}>{s.label || s}</span>)}{(p.sizes || []).length > 3 && <span className="tag" style={{ fontSize: 11 }}>+{p.sizes.length - 3}</span>}</div></td>
+                  <td><div className="tag-list">{(p.colours || p.colors || []).slice(0, 2).map((c, i) => <span key={i} className="tag" style={{ fontSize: 11 }}>{c.name || c}</span>)}</div></td>
+                  <td className="num">{INR(p.purchase_price)}</td>
+                  <td className="num">{INR(p.selling_price)}</td>
+                  <td className="num" style={{ color: Number(p.profit_amount) >= 0 ? '#10b981' : '#ef4444' }}>{INR(p.profit_amount)}</td>
+                  <td className="num">{Number(p.profit_margin || 0).toFixed(1)}%</td>
+                  <td><span className={`chip st-${p.status}`}>{p.status}</span></td>
+                  <td>
+                    <Link to={`/products/${p.id}`} className="btn sm">View</Link>
+                    {(user?.isSuperAdmin || user?.permissions?.includes('products.edit')) && (
+                      <> <Link to={`/products/${p.id}/edit`} className="btn sm">Edit</Link></>
+                    )}
+                    {(user?.isSuperAdmin || user?.permissions?.includes('products.delete')) && (
+                      <> <button className="btn sm danger" onClick={() => setDeleteModal(p)}>Archive</button></>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {!displayedRows.length && <tr><td colSpan={11} style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>No products found</td></tr>}
+            </tbody>
+          </table>
+        )}
 
         {total > 20 && <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
           <button className="btn sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>← Prev</button>

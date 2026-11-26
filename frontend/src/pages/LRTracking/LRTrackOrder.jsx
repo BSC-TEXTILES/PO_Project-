@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import api from '../../api.js';
 import Icon from '../../components/Icon.jsx';
 import LRTimelineModal from './LRTimelineModal.jsx';
+import { TableSkeleton } from '../../components/Skeletons.jsx';
 
 export default function LRTrackOrder() {
   const [searchParams] = useSearchParams();
@@ -190,10 +191,7 @@ export default function LRTrackOrder() {
       {/* Shipment Registry Table */}
       <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '14px', overflow: 'hidden', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '60px 0', color: '#64748b' }}>
-            <div className="login-spinner" style={{ margin: '0 auto 12px' }} />
-            <p>Loading shipment tracking registry...</p>
-          </div>
+          <TableSkeleton rows={8} columns={8} />
         ) : shipments.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 20px', color: '#64748b' }}>
             <Icon name="truck" size={40} style={{ color: '#cbd5e1', margin: '0 auto 12px' }} />

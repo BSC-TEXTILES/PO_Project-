@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../../api.js';
 import Icon from '../../components/Icon.jsx';
+import { TrackingSkeleton } from '../../components/Skeletons.jsx';
 
 export default function LRTimelineModal({ shipmentId, onClose, onRefresh }) {
   const [data, setData] = useState(null);
@@ -167,10 +168,7 @@ export default function LRTimelineModal({ shipmentId, onClose, onRefresh }) {
         {/* Modal Body */}
         <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '40px 0' }}>
-              <div className="login-spinner" style={{ margin: '0 auto 12px' }} />
-              <p>Loading tracking milestones and history...</p>
-            </div>
+            <TrackingSkeleton />
           ) : (
             <>
               {trackingMsg && (
