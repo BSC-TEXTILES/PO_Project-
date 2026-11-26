@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { query, withTransaction, fetchById } from '../config/db.js';
 import { authenticate, requirePermission } from '../middleware/auth.js';
 import { badRequest, ah } from '../utils/httpError.js';
+import { computeProductProfit } from '../utils/pricing.js';
 
 const r = Router();
 r.use(authenticate);
@@ -42,8 +43,9 @@ r.patch('/:id', requirePermission('pricing.manage'), ah(async (req, res) => {
   const newPurchase = purchasePrice !== undefined ? Number(purchasePrice) : existing[0].purchase_price;
   const newSelling = sellingPrice !== undefined ? Number(sellingPrice) : existing[0].selling_price;
   if (newPurchase < 0 || newSelling < 0) throw badRequest('Prices cannot be negative');
-  await query(`UPDATE products SET purchase_price=$2, selling_price=$3, updated_at=NOW(6) WHERE id=$1`,
-    [req.params.id, newPurchase, newSelling]);
+  const { profitAmount, profitMargin } = computeProductProfit(newPurchase, newSelling);
+  await query(`UPDATE products SET purchase_price=$2, selling_price=$3, profit_amount=$4, profit_margin=$5, updated_at=NOW(6) WHERE id=$1`,
+    [req.params.id, newPurchase, newSelling, profitAmount, profitMargin]);
   res.json({ data: await fetchById({ query }, 'products', req.params.id,
     'id, sku, name, purchase_price, selling_price, profit_amount, profit_margin') });
 }));
@@ -67,6 +69,14 @@ r.post('/bulk', requirePermission('pricing.manage'), ah(async (req, res) => {
       if (u.purchasePrice !== undefined) { params.push(Number(u.purchasePrice)); sets.push(`purchase_price=$${params.length}`); }
       if (u.sellingPrice !== undefined) { params.push(Number(u.sellingPrice)); sets.push(`selling_price=$${params.length}`); }
       if (sets.length) {
+        const { rows: [cur] } = await tx.query(`SELECT purchase_price, selling_price FROM products WHERE id=$1`, [u.id]);
+        if (cur) {
+          const pp = u.purchasePrice !== undefined ? Number(u.purchasePrice) : cur.purchase_price;
+          const sp = u.sellingPrice !== undefined ? Number(u.sellingPrice) : cur.selling_price;
+          const { profitAmount, profitMargin } = computeProductProfit(pp, sp);
+          params.push(profitAmount); sets.push(`profit_amount=$${params.length}`);
+          params.push(profitMargin); sets.push(`profit_margin=$${params.length}`);
+        }
         await tx.query(`UPDATE products SET ${sets.join(', ')}, updated_at=NOW(6) WHERE id=$1`, params);
         n++;
       }

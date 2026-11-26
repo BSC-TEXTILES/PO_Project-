@@ -101,7 +101,7 @@ export default function Receipts() {
             <label className="field"><span className="field-label">Issued / partially-received PO</span>
               <select value={selectedPO} onChange={(e) => choosePO(e.target.value)}>
                 <option value="">— select —</option>
-                {openPOs.map((p) => <option key={p.id} value={p.id}>{p.po_number} · {p.supplier_name} · <StatusChip status={p.status} /> · ₹{Number(p.grand_total).toLocaleString('en-IN')}</option>)}
+                {openPOs.map((p) => <option key={p.id} value={p.id}>{p.po_number} · {p.supplier_name} · {(p.status || '').replace(/_/g, ' ')} · ₹{Number(p.grand_total).toLocaleString('en-IN')}</option>)}
               </select>
             </label>
             <label className="field"><span className="field-label">Delivery date</span>

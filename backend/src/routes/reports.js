@@ -1,7 +1,9 @@
 import { Router } from 'express';
+import * as XLSX from 'xlsx';
 import { query } from '../config/db.js';
 import { authenticate, requirePermission } from '../middleware/auth.js';
 import { badRequest, ah } from '../utils/httpError.js';
+import { renderReportPDF } from '../utils/pdfExport.js';
 
 // Dashboards, reporting and analytics — FRS §16, RB-018 (no cross-division leakage).
 const r = Router();
@@ -9,8 +11,9 @@ r.use(authenticate, requirePermission('reports.view'));
 
 const NIL_UUID = '00000000-0000-0000-0000-000000000000';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-// Location codes used by the header dropdown that differ from the division code.
-const LOCATION_CODE_ALIASES = { BGV: 'BLG' };
+// Location codes used by the header dropdown / LR module that differ from division code.
+const LOCATION_CODE_ALIASES = { BGV: 'BLG', BEL: 'BLG', DAV: 'DVG', SHI: 'SMG' };
+const LR_STORE_ALIASES = { BLG: 'BEL', BGV: 'BEL', DVG: 'DAV', SMG: 'SHI' };
 const escapeLike = (v) => v.replace(/[\\%_]/g, (c) => '\\' + c);
 
 // Resolve the dashboard ?location= (division UUID, code, or name) to division IDs.
@@ -59,6 +62,15 @@ async function poScope(req) {
   } else if (mySections.length) {
     params.push(mySections);
     clauses.push(`po.section_id IN ($${params.length})`);
+  }
+
+  if (req.query.from && /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.from))) {
+    params.push(String(req.query.from));
+    clauses.push(`po.po_date >= $${params.length}`);
+  }
+  if (req.query.to && /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.to))) {
+    params.push(String(req.query.to));
+    clauses.push(`po.po_date <= $${params.length}`);
   }
   return { params, W: clauses.length ? clauses.join(' AND ') : 'TRUE', divIds };
 }
@@ -171,11 +183,51 @@ r.get('/dashboard', ah(async (req, res) => {
        FROM purchase_orders po WHERE ${W}`, params)).rows[0];
 
   // Names of the collections this user is authorized for (header chips).
-  const mySections = req.user.isSuperAdmin ? [] : (await query(
+  const mySections = req.user.isSuperAdmin ? [] : (req.user.sectionIds || []).map(String);
+  const mySectionRows = !mySections.length ? [] : (await query(
     `SELECT s.id, s.name FROM sections s JOIN user_sections us ON us.section_id = s.id
       WHERE us.user_id = $1 ORDER BY s.name`, [req.user.id])).rows;
 
-  res.json({ kpis, byDivision, byStatus, bySection, bySupplier, recentAudit, divisionAdmins, monthly, recentPOs, workProgress, mySections });
+  // Real LR Tracking summary & pending tasks (scoped by location when filtered)
+  let lrSummary = { total: 0, in_transit: 0, delivered: 0, delayed_count: 0, exceptions: 0, pending_receipt: 0 };
+  try {
+    let lrWhere = 'TRUE';
+    const lrParams = [];
+    if (divIds && divIds.length) {
+      const { rows: divCodes } = await query(`SELECT code FROM divisions WHERE id IN ($1)`, [divIds]);
+      const storeCodes = divCodes.map((d) => LR_STORE_ALIASES[d.code] || d.code);
+      if (storeCodes.length) {
+        lrParams.push(storeCodes);
+        lrWhere = `destination_store IN ($${lrParams.length})`;
+      }
+    }
+    const { rows: [lrRow] } = await query(
+      `SELECT COUNT(*) AS total,
+              SUM(CASE WHEN current_status IN ('in_transit', 'at_hub', 'out_for_delivery') THEN 1 ELSE 0 END) AS in_transit,
+              SUM(CASE WHEN current_status = 'delivered' OR store_received_status = 'received_verified' THEN 1 ELSE 0 END) AS delivered,
+              SUM(CASE WHEN current_status = 'delayed' THEN 1 ELSE 0 END) AS delayed_count,
+              SUM(CASE WHEN current_status = 'exception' THEN 1 ELSE 0 END) AS exceptions,
+              SUM(CASE WHEN store_received_status = 'pending' AND current_status <> 'cancelled' THEN 1 ELSE 0 END) AS pending_receipt
+         FROM lr_tracking WHERE ${lrWhere}`, lrParams);
+    if (lrRow) lrSummary = lrRow;
+  } catch { /* lr_tracking optional if not yet migrated */ }
+
+  // Pending approvals waiting in queue (scoped)
+  let pendingApprovalList = [];
+  try {
+    pendingApprovalList = (await query(
+      `SELECT po.id, po.po_number, po.po_date, po.grand_total, po.status, d.name AS division_name, sup.company_name AS supplier_name
+         FROM purchase_orders po
+         JOIN divisions d ON d.id = po.division_id
+         JOIN suppliers sup ON sup.id = po.supplier_id
+        WHERE ${W} AND po.status IN ('submitted', 'under_review')
+        ORDER BY po.created_at ASC LIMIT 6`, params)).rows;
+  } catch {}
+
+  res.json({
+    kpis, byDivision, byStatus, bySection, bySupplier, recentAudit, divisionAdmins,
+    monthly, recentPOs, workProgress, mySections: mySectionRows, lrSummary, pendingApprovalList,
+  });
 }));
 
 // GET /api/reports/men-summary — restricted Division Supervisor summary (RB-018).
@@ -388,14 +440,14 @@ r.get('/calendar/:date', ah(async (req, res) => {
   res.json({ date: req.params.date, totals, data: rows });
 }));
 
-// GET /api/reports/:name?format=csv — §16.3 reports catalogue + CSV export
+// GET /api/reports/:name?format=csv|xlsx|pdf — §16.3 reports catalogue + CSV/Excel/PDF export
 r.get('/:name', ah(async (req, res) => {
   const { name } = req.params;
-  const { from, to, divisionId } = req.query;
+  const { from, to } = req.query;
   const params = [];
   const clauses = [];
-  if (!req.user.isSuperAdmin) { params.push(req.user.divisionIds); clauses.push(`po.division_id IN ($${params.length})`); }
-  if (divisionId) { params.push(divisionId); clauses.push(`po.division_id = $${params.length}`); }
+  const divIds = await effectiveDivisionIds(req);
+  if (divIds) { params.push(divIds); clauses.push(`po.division_id IN ($${params.length})`); }
   if (from) { params.push(from); clauses.push(`po.po_date >= $${params.length}`); }
   if (to) { params.push(to); clauses.push(`po.po_date <= $${params.length}`); }
   const W = clauses.length ? 'AND ' + clauses.join(' AND ') : '';
@@ -445,58 +497,116 @@ r.get('/:name', ah(async (req, res) => {
   if (!sql) throw badRequest(`Unknown report "${name}". Available: ${Object.keys(reports).join(', ')}`);
   const { rows } = await query(sql, params);
 
-  if (req.query.format === 'csv') {
-    // Report-style CSV: title block → data table → OVERALL SUMMARY block, so the
-    // downloaded file opens in Excel exactly like a formatted report (§16.3).
+  const fmt = String(req.query.format || '').toLowerCase();
+  const REPORT_LABELS = {
+    'po-register': 'Purchase Order Register',
+    'purchase-summary': 'Purchase Summary by Division / Department / Section',
+    'dealer': 'Dealer-wise Order Report',
+    'size': 'Size-wise Quantity Report',
+    'margin': 'Product Margin Report',
+    'receiving': 'Goods Receiving / Pending Report',
+  };
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const fmtDate = (v) => {
+    if (v === null || v === undefined || v === '') return '';
+    const d = new Date(v);
+    if (isNaN(d.getTime())) return v;
+    return `${String(d.getDate()).padStart(2, '0')}-${MONTHS[d.getMonth()]}-${d.getFullYear()}`;
+  };
+  const isDateCol = (c) => /(^|_)(date|at)$/i.test(c) || /date/i.test(c);
+
+  if (fmt === 'xlsx') {
+    const wb = XLSX.utils.book_new();
+    const cols = rows.length ? Object.keys(rows[0]) : ['Message'];
+    const sheetRows = rows.length
+      ? rows.map((row) => {
+          const obj = {};
+          for (const c of cols) {
+            const label = c.replace(/_/g, ' ').toUpperCase();
+            obj[label] = isDateCol(c) ? fmtDate(row[c]) : row[c];
+          }
+          return obj;
+        })
+      : [{ Message: 'No records found for the selected filters.' }];
+    if (rows.length) {
+      const totalObj = {};
+      cols.forEach((c, idx) => {
+        const label = c.replace(/_/g, ' ').toUpperCase();
+        if (idx === 0) totalObj[label] = 'OVERALL TOTAL';
+        else if (rows.every((r2) => r2[c] === null || typeof r2[c] === 'number')) {
+          const s = rows.reduce((a, r2) => a + (Number(r2[c]) || 0), 0);
+          totalObj[label] = Number.isInteger(s) ? s : Number(s.toFixed(2));
+        } else totalObj[label] = '';
+      });
+      sheetRows.push(totalObj);
+    }
+    const ws = XLSX.utils.json_to_sheet(sheetRows);
+    XLSX.utils.book_append_sheet(wb, ws, (REPORT_LABELS[name] || name).slice(0, 31));
+    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${name}-${new Date().toISOString().slice(0, 10)}.xlsx"`);
+    return res.send(buf);
+  }
+
+  if (fmt === 'pdf') {
+    const cols = rows.length ? Object.keys(rows[0]) : [];
+    const numCols = cols.filter((c) => rows.every((r2) => r2[c] === null || typeof r2[c] === 'number'));
+    const pdfCols = cols.map((c) => {
+      const isNum = numCols.includes(c);
+      const isMoney = isNum && /(total|value|price|tax|charges|margin|subtotal)/i.test(c) && !/percent/i.test(c);
+      return { label: c.replace(/_/g, ' ').toUpperCase(), key: c, width: isNum ? 75 : 95, num: isNum, money: isMoney };
+    });
+    const summary = [`Total Records: ${rows.length}`];
+    for (const c of numCols) {
+      const sum = rows.reduce((a, r2) => a + (Number(r2[c]) || 0), 0);
+      summary.push(`Total ${c.replace(/_/g, ' ')}: ${Number.isInteger(sum) ? sum.toLocaleString('en-IN') : sum.toFixed(2)}`);
+    }
+    const pdfBuf = renderReportPDF({
+      title: REPORT_LABELS[name] || name,
+      generatedBy: req.user.fullName,
+      filters: [
+        { label: 'From', value: from || '' },
+        { label: 'To', value: to || '' },
+        { label: 'Location', value: req.query.location || '' },
+      ],
+      columns: pdfCols,
+      rows,
+      summary,
+    });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${name}-${new Date().toISOString().slice(0, 10)}.pdf"`);
+    return res.send(pdfBuf);
+  }
+
+  if (fmt === 'csv') {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${name}-${new Date().toISOString().slice(0, 10)}.csv"`);
     const esc = (v) => v === null || v === undefined ? '' : `"${String(v).replace(/"/g, '""')}"`;
-    // Properly formatted dates — no raw ISO/UTC "star" timestamps in downloads.
-    const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const fmtDate = (v) => {
-      if (v === null || v === undefined || v === '') return '';
-      const d = new Date(v);
-      if (isNaN(d.getTime())) return v;
-      // Prefix with \t and wrap in quotes to force Excel to treat as text
-      return `\t"${String(d.getDate()).padStart(2, '0')}-${MONTHS[d.getMonth()]}-${d.getFullYear()}"`;
-    };
-    const isDateCol = (c) => /(^|_)(date|at)$/i.test(c) || /date/i.test(c);
-    const fmtVal = (c, v) => (isDateCol(c) ? fmtDate(v) : v);
+    const fmtVal = (c, v) => (isDateCol(c) ? `\t"${fmtDate(v)}"` : v);
     const L = [];
-    const REPORT_LABELS = {
-      'po-register': 'Purchase Order Register',
-      'purchase-summary': 'Purchase Summary by Division / Department / Section',
-      'dealer': 'Dealer-wise Order Report',
-      'size': 'Size-wise Quantity Report',
-      'margin': 'Product Margin Report',
-      'receiving': 'Goods Receiving / Pending Report',
-    };
-    // ── Title block ──
     L.push(['BSC EXCLUSIVE — PURCHASE ORDER MANAGEMENT SYSTEM'].map(esc).join(','));
     L.push([REPORT_LABELS[name] || name].map(esc).join(','));
     L.push([`Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST`].map(esc).join(','));
-    const rangeLabel = from || to ? `Date Range: ${from || 'Start'} to ${to || 'Today'}${divisionId ? ` | Division: ${divisionId}` : ''}` : 'Date Range: All records';
+    const rangeLabel = from || to ? `Date Range: ${from || 'Start'} to ${to || 'Today'}` : 'Date Range: All records';
     L.push([rangeLabel].map(esc).join(','));
     L.push('');
     if (!rows.length) {
       L.push(['No records found for the selected filters.'].map(esc).join(','));
-      return res.send(L.join('\n'));
+      return res.send('\uFEFF' + L.join('\n'));
     }
-    // ── Data table ──
     const cols = Object.keys(rows[0]);
     const numCols = cols.filter((c) => rows.every((r2) => r2[c] === null || typeof r2[c] === 'number'));
     L.push(cols.map((c) => esc(c.replace(/_/g, ' ').toUpperCase())).join(','));
     rows.forEach((r2) => L.push(cols.map((c) => esc(fmtVal(c, r2[c]))).join(',')));
-    // ── OVERALL SUMMARY block ──
     L.push('');
     L.push(['OVERALL SUMMARY'].map(esc).join(','));
     L.push(['Total Records', rows.length].map(esc).join(','));
-    const fmt = (n) => (Number.isInteger(Number(n)) ? String(Number(n)) : Number(n).toFixed(2));
+    const fmtNum = (n) => (Number.isInteger(Number(n)) ? String(Number(n)) : Number(n).toFixed(2));
     numCols.forEach((c) => {
       const sum = rows.reduce((a, r2) => a + (Number(r2[c]) || 0), 0);
-      L.push([`Total ${c.replace(/_/g, ' ')}`, fmt(sum)].map(esc).join(','));
+      L.push([`Total ${c.replace(/_/g, ' ')}`, fmtNum(sum)].map(esc).join(','));
     });
-    return res.send(L.join('\n'));
+    return res.send('\uFEFF' + L.join('\n'));
   }
   res.json({ name, columns: rows.length ? Object.keys(rows[0]) : [], data: rows });
 }));

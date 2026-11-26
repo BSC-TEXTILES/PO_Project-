@@ -3,6 +3,15 @@
 
 export const round2 = (v) => Math.round((Number(v) + Number.EPSILON) * 100) / 100;
 
+/** Computes stored profit_amount and profit_margin for products table writes. */
+export function computeProductProfit(purchasePrice, sellingPrice) {
+  const pp = round2(Number(purchasePrice) || 0);
+  const sp = round2(Number(sellingPrice) || 0);
+  const profitAmount = round2(sp - pp);
+  const profitMargin = pp > 0 ? round2((profitAmount / pp) * 100) : 0;
+  return { profitAmount, profitMargin };
+}
+
 export function computeLineTotals({ purchasePrice, marginPercent, discountType, discountValue, totalQuantity }) {
   const price = round2(purchasePrice);
   if (!(price >= 0)) throw new Error('RB-008: purchase price cannot be negative');

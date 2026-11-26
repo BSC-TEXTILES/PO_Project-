@@ -53,7 +53,6 @@ const SECTIONS = [
       { to: '/chat', label: 'Team Chat', icon: 'chat', permission: 'chat.view' },
       { to: '/approvals', label: 'Approval Queue', icon: 'approvals', permission: 'approvals.view' },
       { to: '/receipts', label: 'Receiving', icon: 'receipts', permission: 'receipt.view' },
-      { to: '/auctions', label: 'Auctions', icon: 'trophy', permission: 'auctions.view' },
       { to: '/masters', label: 'Masters', icon: 'masters', permission: 'masters.view', hiddenRoles: ['purchase_executive'] },
       { to: '/pricing', label: 'Pricing', icon: 'reports', permission: 'pricing.view', hiddenRoles: ['purchase_executive'] },
       { to: '/export-data', label: 'Export Data', icon: 'reports', permission: 'reports.export', hiddenRoles: ['purchase_executive'] },
@@ -105,7 +104,7 @@ function canSee(item, user) {
   return true;
 }
 
-export default function Sidebar({ collapsed, onToggle }) {
+export default function Sidebar({ collapsed, onToggle, mobileOpen, onCloseMobile }) {
   const { user } = useAuth();
   const canBrowse = user.isSuperAdmin || user.permissions?.includes('masters.view') || user.permissions?.includes('catalogue.view');
   // Division Supervisor: strictly restricted — Men's collection and PO viewing
@@ -148,69 +147,71 @@ export default function Sidebar({ collapsed, onToggle }) {
     ? SECTIONS.filter((s) => !s.label || ['Collections', 'Orders'].includes(s.label))
     : SECTIONS;
   return (
-    <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
-      <div className="sidebar-brand-wrapper">
-        <div className="brand donezo-brand">
-          <img src="/bsc-logo.png" alt="BSC Exclusive" className="brand-mark-img" style={{ width: 36, height: 36, borderRadius: 8 }} />
-          {!collapsed && (
-            <div className="brand-name">BSC Exclusive</div>
-          )}
-        </div>
-        <button
-          type="button"
-          className="sidebar-hamburger-btn"
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          onClick={onToggle}
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          <Icon name="menu" size={20} />
-        </button>
-      </div>
-      <div className="sidebar-scroll">
-        <nav>
-          {navSections.map((section, si) => {
-            const visible = section.items.filter((n) => canSee(n, user));
-            if (!visible.length) return null;
-            return (
-              <div key={si} className="nav-section">
-                {!collapsed && section.label && <div className="nav-section-label">{section.label}</div>}
-                {visible.map((n) => (
-                  <NavLink key={n.to} to={n.to} end={n.end} title={n.label}
-                    className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>
-                    <Icon name={n.icon} size={18} />
-                    {!collapsed && <span>{n.label}</span>}
-                  </NavLink>
-                ))}
-
-                {/* Flat Collection Links (Men's Collection, Women's Collection, Kids Collection, Home & Furnishing) */}
-                {section.label === 'Collections' && canBrowse && (
-                  departmentGroups.map((g) => (
-                    <NavLink
-                      key={g.key}
-                      to={`/collection/${g.key}`}
-                      title={g.title}
-                      className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}
-                    >
-                      <CollectionIcon name={g.icon} size={18} className="icon" />
-                      {!collapsed && <span>{g.title}</span>}
-                    </NavLink>
-                  ))
-                )}
+    <>
+      {mobileOpen && <div className="sidebar-mobile-backdrop" onClick={onCloseMobile} />}
+      <aside className={`sidebar ${collapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}>
+        <div className="sidebar-brand-wrapper">
+          <div className="brand donezo-brand">
+            <img src="/bsc-logo.png" alt="BSC Exclusive" className="brand-mark-img" style={{ width: 34, height: 34, borderRadius: 8 }} />
+            {(!collapsed || mobileOpen) && (
+              <div style={{ minWidth: 0 }}>
+                <div className="brand-name">BSC Textiles</div>
+                <div className="brand-sub">Enterprise POMS</div>
               </div>
-            );
-          })}
-        </nav>
-        <div style={{ marginTop: 'auto', paddingTop: 20 }}>
-          {!collapsed && (
-            <div className="donezo-mobile-promo">
-              <div className="promo-icon"><Icon name="po" size={24} /></div>
-              <strong>BSC Exclusive Mobile App</strong>
-              <span>Manage orders on the go</span>
-              <button className="btn">Download</button>
+            )}
+          </div>
+          <button
+            type="button"
+            className="sidebar-hamburger-btn"
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            onClick={mobileOpen ? onCloseMobile : onToggle}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            <Icon name={mobileOpen ? 'x' : 'menu'} size={18} />
+          </button>
+        </div>
+        <div className="sidebar-scroll">
+          <nav>
+            {navSections.map((section, si) => {
+              const visible = section.items.filter((n) => canSee(n, user));
+              if (!visible.length) return null;
+              return (
+                <div key={si} className="nav-section">
+                  {(!collapsed || mobileOpen) && section.label && <div className="nav-section-label">{section.label}</div>}
+                  {visible.map((n) => (
+                    <NavLink key={n.to} to={n.to} end={n.end} title={n.label} onClick={onCloseMobile}
+                      className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>
+                      <Icon name={n.icon} size={18} />
+                      {(!collapsed || mobileOpen) && <span>{n.label}</span>}
+                    </NavLink>
+                  ))}
+
+                  {/* Flat Collection Links */}
+                  {section.label === 'Collections' && canBrowse && (
+                    departmentGroups.map((g) => (
+                      <NavLink
+                        key={g.key}
+                        to={`/collection/${g.key}`}
+                        title={g.title}
+                        onClick={onCloseMobile}
+                        className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}
+                      >
+                        <CollectionIcon name={g.icon} size={18} className="icon" />
+                        {(!collapsed || mobileOpen) && <span>{g.title}</span>}
+                      </NavLink>
+                    ))
+                  )}
+                </div>
+              );
+            })}
+          </nav>
+          {(!collapsed || mobileOpen) && (
+            <div className="sidebar-foot" style={{ paddingTop: 14, borderTop: '1px solid var(--line)', marginTop: 14 }}>
+              BSC Exclusive · POMS v2.0
             </div>
           )}
         </div>
-      </div>
-    </aside>
+      </aside>
+    </>
   );
 }

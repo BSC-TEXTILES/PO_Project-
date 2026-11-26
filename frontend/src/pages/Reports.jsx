@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import api, { errMessage } from '../api.js';
+import { useAuth } from '../auth.jsx';
+import DateRangeBar from '../components/DateRangeBar.jsx';
 import { TableSkeleton, ChartSkeleton } from '../components/Skeletons.jsx';
 
 const REPORTS = [
@@ -11,8 +13,6 @@ const REPORTS = [
   { key: 'receiving', label: 'Receiving Report' },
 ];
 
-// Zero-dependency SVG bar chart — visualises the first numeric column of the
-// report so every report view includes a chart alongside the table.
 function ReportBarChart({ columns, data }) {
   const numCols = columns.filter((c) => data.some((r) => typeof r[c] === 'number'));
   if (!numCols.length || data.length < 1) return null;
@@ -54,58 +54,97 @@ function ReportBarChart({ columns, data }) {
 }
 
 export default function Reports() {
+  const { selectedLocation } = useAuth();
   const [report, setReport] = useState('po-register');
-  const [range, setRange] = useState({ from: '', to: '' });
+  const [dateState, setDateState] = useState({ preset: 'all', from: '', to: '' });
+  const [locationFilter, setLocationFilter] = useState(() => (selectedLocation && !selectedLocation.toLowerCase().includes('all location') ? selectedLocation : ''));
+  const [divisions, setDivisions] = useState([]);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [exporting, setExporting] = useState('');
+
+  useEffect(() => {
+    api.get('/divisions').then((r) => setDivisions(r.data?.data || [])).catch(() => {});
+  }, []);
 
   async function run() {
     setBusy(true); setError('');
     try {
       const params = {};
-      if (range.from) params.from = range.from;
-      if (range.to) params.to = range.to;
+      if (dateState.from) params.from = dateState.from;
+      if (dateState.to) params.to = dateState.to;
+      if (locationFilter) params.location = locationFilter;
       const { data } = await api.get(`/reports/${report}`, { params });
       setResult(data);
     } catch (e) { setError(errMessage(e)); } finally { setBusy(false); }
   }
 
-  async function exportCsv() {
+  async function downloadFormat(fmt) {
+    setExporting(fmt); setError('');
     try {
-      const params = { format: 'csv' };
-      if (range.from) params.from = range.from;
-      if (range.to) params.to = range.to;
+      const params = { format: fmt };
+      if (dateState.from) params.from = dateState.from;
+      if (dateState.to) params.to = dateState.to;
+      if (locationFilter) params.location = locationFilter;
       const res = await api.get(`/reports/${report}`, { params, responseType: 'blob' });
       const url = URL.createObjectURL(res.data);
       const a = document.createElement('a');
-      a.href = url; a.download = `${report}.csv`; a.click();
+      a.href = url;
+      a.download = `${report}-${new Date().toISOString().slice(0, 10)}.${fmt}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
       URL.revokeObjectURL(url);
-    } catch (e) { setError(errMessage(e)); }
+    } catch (e) {
+      setError(errMessage(e));
+    } finally {
+      setExporting('');
+    }
   }
 
   return (
     <div className="page">
-      <h1 className="page-title">Reports</h1>
-      <p className="page-sub">Operational and management reporting with CSV export (§16.3, §16.4)</p>
-      {error && <div className="alert error">{error}</div>}
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Reports & Analytics</h1>
+          <p className="page-sub" style={{ margin: 0 }}>Operational and management reporting with Excel, PDF, and CSV exports</p>
+        </div>
+      </div>
+      {error && <div className="alert error" style={{ marginTop: 12 }}>{error}</div>}
+
+      <div style={{ marginTop: 14 }}>
+        <DateRangeBar preset={dateState.preset} from={dateState.from} to={dateState.to} onChange={setDateState} />
+      </div>
 
       <div className="panel">
-        <div className="row" style={{ alignItems: 'flex-end' }}>
-          <label className="field"><span className="field-label">Report</span>
+        <div className="row" style={{ alignItems: 'flex-end', gap: 12 }}>
+          <label className="field" style={{ minWidth: 200 }}><span className="field-label">Report Type</span>
             <select value={report} onChange={(e) => { setReport(e.target.value); setResult(null); }}>
               {REPORTS.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
             </select>
           </label>
-          <label className="field"><span className="field-label">From</span>
-            <input type="date" value={range.from} onChange={(e) => setRange({ ...range, from: e.target.value })} />
+          <label className="field" style={{ minWidth: 180 }}><span className="field-label">Location</span>
+            <select value={locationFilter} onChange={(e) => setLocationFilter(e.target.value)}>
+              <option value="">All Authorized Locations</option>
+              {divisions.map((d) => <option key={d.id} value={d.id}>{d.name} ({d.code})</option>)}
+            </select>
           </label>
-          <label className="field"><span className="field-label">To</span>
-            <input type="date" value={range.to} onChange={(e) => setRange({ ...range, to: e.target.value })} />
-          </label>
-          <button className="btn primary" disabled={busy} onClick={run}>{busy ? 'Running…' : 'Run report'}</button>
-          {result && <button className="btn accent" onClick={exportCsv}>⬇ Export CSV</button>}
-          {result && result.data.length > 0 && <button className="btn" onClick={() => window.print()}>🖨 Print</button>}
+          <button className="btn primary" disabled={busy} onClick={run}>{busy ? 'Running…' : 'Run Report'}</button>
+          {result && (
+            <>
+              <button className="btn accent" disabled={!!exporting} onClick={() => downloadFormat('xlsx')}>
+                {exporting === 'xlsx' ? 'Exporting…' : '⬇ Excel (.xlsx)'}
+              </button>
+              <button className="btn" disabled={!!exporting} onClick={() => downloadFormat('pdf')}>
+                {exporting === 'pdf' ? 'Exporting…' : '⬇ PDF'}
+              </button>
+              <button className="btn" disabled={!!exporting} onClick={() => downloadFormat('csv')}>
+                {exporting === 'csv' ? 'Exporting…' : '⬇ CSV'}
+              </button>
+              {result.data.length > 0 && <button className="btn" onClick={() => window.print()}>🖨 Print</button>}
+            </>
+          )}
         </div>
 
         {busy && (
@@ -117,42 +156,44 @@ export default function Reports() {
 
         {!busy && result && (
           <div className="mt" id="report-print-area">
-            {result.data.length === 0 && <p className="muted">No rows for the selected range.</p>}
+            {result.data.length === 0 && <p className="muted">No rows found for the selected filters.</p>}
             {result.data.length > 0 && (
               <>
                 <ReportBarChart columns={result.columns} data={result.data} />
-                <table className="grid">
-                  <thead><tr>{result.columns.map((c) => <th key={c} className={typeof result.data[0][c] === 'number' ? 'num' : ''}>{c.replace(/_/g, ' ')}</th>)}</tr></thead>
-                  <tbody>
-                    {result.data.slice(0, 200).map((row, i) => (
-                      <tr key={i}>{result.columns.map((c) => {
-                        const isNum = typeof row[c] === 'number';
-                        const isDate = !isNum && /date/i.test(c) && row[c] && !isNaN(new Date(row[c]).getTime());
-                        return (
-                          <td key={c} className={isNum ? 'num' : ''}>
-                            {isNum ? row[c].toLocaleString('en-IN')
-                              : isDate ? new Date(row[c]).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-                              : (row[c] ?? '—')}
-                          </td>
-                        );
-                      })}</tr>
-                    ))}
-                    <tr className="report-summary-row">
-                      {result.columns.map((c, idx) => {
-                        const isNum = result.data.every((r) => r[c] === null || typeof r[c] === 'number');
-                        if (idx === 0) return <td key={c} className="num"><strong>OVERALL TOTAL</strong></td>;
-                        if (isNum) {
-                          const sum = result.data.reduce((a, r) => a + (Number(r[c]) || 0), 0);
-                          return <td key={c} className="num"><strong>{Number.isInteger(sum) ? sum.toLocaleString('en-IN') : sum.toFixed(2)}</strong></td>;
-                        }
-                        return <td key={c} />;
-                      })}
-                    </tr>
-                  </tbody>
-                </table>
+                <div className="table-responsive">
+                  <table className="grid">
+                    <thead><tr>{result.columns.map((c) => <th key={c} className={typeof result.data[0][c] === 'number' ? 'num' : ''}>{c.replace(/_/g, ' ')}</th>)}</tr></thead>
+                    <tbody>
+                      {result.data.slice(0, 200).map((row, i) => (
+                        <tr key={i}>{result.columns.map((c) => {
+                          const isNum = typeof row[c] === 'number';
+                          const isDate = !isNum && /date/i.test(c) && row[c] && !isNaN(new Date(row[c]).getTime());
+                          return (
+                            <td key={c} className={isNum ? 'num' : ''}>
+                              {isNum ? row[c].toLocaleString('en-IN')
+                                : isDate ? new Date(row[c]).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+                                : (row[c] ?? '—')}
+                            </td>
+                          );
+                        })}</tr>
+                      ))}
+                      <tr className="report-summary-row">
+                        {result.columns.map((c, idx) => {
+                          const isNum = result.data.every((r) => r[c] === null || typeof r[c] === 'number');
+                          if (idx === 0) return <td key={c}><strong>OVERALL TOTAL</strong></td>;
+                          if (isNum) {
+                            const sum = result.data.reduce((a, r) => a + (Number(r[c]) || 0), 0);
+                            return <td key={c} className="num"><strong>{Number.isInteger(sum) ? sum.toLocaleString('en-IN') : sum.toFixed(2)}</strong></td>;
+                          }
+                          return <td key={c} />;
+                        })}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               </>
             )}
-            {result.data.length > 200 && <p className="muted mt">Showing first 200 of {result.data.length} rows — export CSV for the full set.</p>}
+            {result.data.length > 200 && <p className="muted mt">Showing first 200 of {result.data.length} rows — export Excel or CSV for the full dataset.</p>}
           </div>
         )}
       </div>

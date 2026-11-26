@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import { query, withTransaction, pool, newId, nextNumber, businessDate } from '../config/db.js';
 import { authenticate, requirePermission, requireAnyPermission, scopeDivision, scopeSection } from '../middleware/auth.js';
 import { badRequest, forbidden, notFoundError, ah } from '../utils/httpError.js';
-import { computeLineTotals, round2 } from '../utils/pricing.js';
+import { computeLineTotals, round2, computeProductProfit } from '../utils/pricing.js';
 import { generateBrandQR, generatePOQR, generatePOQRPNG } from '../utils/qrCode.js';
 import { fetchBrandImage } from '../utils/brandImage.js';
 import { logAudit } from '../utils/audit.js';
@@ -1270,24 +1270,28 @@ r.post('/import/csv-commit', requireAnyPermission(['masters.manage', 'po.create'
 
       if (existingProductId) {
         if (updateExisting) {
+          const { profitAmount, profitMargin } = computeProductProfit(parsed.purchasePrice, parsed.sellingPrice);
           await client.query(
             `UPDATE products
                 SET purchase_price = COALESCE(NULLIF($2, 0), purchase_price),
                     selling_price  = COALESCE(NULLIF($3, 0), selling_price),
+                    profit_amount  = COALESCE(NULLIF($5, 0), profit_amount),
+                    profit_margin  = COALESCE(NULLIF($6, 0), profit_margin),
                     brand_id       = COALESCE($4, brand_id),
                     updated_at     = now()
               WHERE id = $1`,
-            [existingProductId, parsed.purchasePrice, parsed.sellingPrice, brandId]
+            [existingProductId, parsed.purchasePrice, parsed.sellingPrice, brandId, profitAmount, profitMargin]
           );
           productsUpdated++;
         }
       } else {
         const serial = `PRD-${Date.now().toString(36).slice(-5).toUpperCase()}-${i}-${Math.floor(Math.random() * 100)}`;
         const newProductId = newId();
+        const { profitAmount, profitMargin } = computeProductProfit(parsed.purchasePrice, parsed.sellingPrice);
         await client.query(
           `INSERT INTO products (id, sku, barcode, product_serial, name, brand_id, department_id, section_id,
-                                 hsn_sac, purchase_price, selling_price, status)
-           VALUES ($11, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'active')`,
+                                 hsn_sac, purchase_price, selling_price, profit_amount, profit_margin, status)
+           VALUES ($11, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $12, $13, 'active')`,
           [
             sku,
             sku,
@@ -1298,7 +1302,7 @@ r.post('/import/csv-commit', requireAnyPermission(['masters.manage', 'po.create'
             sectionId,
             parsed.hsn || '6205',
             parsed.purchasePrice,
-            parsed.sellingPrice, newProductId]);
+            parsed.sellingPrice, newProductId, profitAmount, profitMargin]);
         const { rows: [newP] } = await client.query(`SELECT id FROM products WHERE id = $1`, [newProductId]);
         productMap.set(skuNorm, newP.id);
         productsInserted++;

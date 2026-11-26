@@ -4,6 +4,7 @@ import { query, withTransaction, pool, newId, nextNumber } from '../config/db.js
 import { authenticate, requirePermission, requireAnyPermission } from '../middleware/auth.js';
 import { badRequest, ah } from '../utils/httpError.js';
 import { logAudit } from '../utils/audit.js';
+import { computeProductProfit } from '../utils/pricing.js';
 import { generateBrandQR } from '../utils/qrCode.js';
 import { fetchBrandImage } from '../utils/brandImage.js';
 import { upload, publicUrl, removeStored, fileStorageKey } from '../utils/storage.js';
@@ -581,12 +582,13 @@ r.post('/products', requireAnyPermission(['masters.manage', 'products.create']),
     const year = new Date().getFullYear();
     const newProductId = newId();
     const productSerial = await nextNumber(client, 'PRD', null, year);
+    const { profitAmount, profitMargin } = computeProductProfit(purchasePrice, sellingPrice);
     await client.query(
-      `INSERT INTO products (id, product_serial, sku, name, description, brand_id, section_id, category_id, attributes, hsn_sac, tax_category, purchase_price, selling_price)
-       VALUES ($13, $1, $2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+      `INSERT INTO products (id, product_serial, sku, name, description, brand_id, section_id, category_id, attributes, hsn_sac, tax_category, purchase_price, selling_price, profit_amount, profit_margin)
+       VALUES ($13, $1, $2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$14,$15)`,
       [productSerial, sku, name, description || null, brandId, sectionId, categoryId || null,
        attributes ? JSON.stringify(attributes) : '{}', hsnSac || null, taxCategory || null,
-       purchasePrice || null, sellingPrice || null, newProductId]);
+       purchasePrice || null, sellingPrice || null, newProductId, profitAmount, profitMargin]);
     const { rows } = await client.query(`SELECT * FROM products WHERE id = $1`, [newProductId]);
     await logAudit(client, { userId: req.user.id, role: req.user.roles.join(','), actionType: 'create', entityType: 'product', entityId: rows[0].id, afterValue: { sku, name } });
     return rows[0];

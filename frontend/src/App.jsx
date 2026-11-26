@@ -93,6 +93,11 @@ export default function App() {
   const { user, loading, isSignedIn } = useAuth();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('poms_sidebar') === '1');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
 
   useEffect(() => {
     localStorage.setItem('poms_sidebar', collapsed ? '1' : '0');
@@ -133,9 +138,14 @@ export default function App() {
 
   return (
     <div className={`shell ${collapsed ? 'collapsed' : ''}`}>
-      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)} />
+      <Sidebar
+        collapsed={collapsed}
+        onToggle={() => setCollapsed((c) => !c)}
+        mobileOpen={mobileMenuOpen}
+        onCloseMobile={() => setMobileMenuOpen(false)}
+      />
       <div className="main">
-        <Topbar collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)} />
+        <Topbar collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)} onOpenMobile={() => setMobileMenuOpen(true)} />
         <main className="content">
           {/* Mandatory profile completion for admin-created accounts */}
           {user && !user.profileUpdatedAt && <ProfileModal />}

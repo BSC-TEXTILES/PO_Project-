@@ -30,9 +30,9 @@ const ROLE_LABELS = {
 };
 
 const LOCATIONS = [
-  'All locations (BGV + DVG + SMG)',
+  'All Locations',
   'Belagavi',
-  'Davangere',
+  'Davanagere',
   'Shivamogga',
 ];
 
@@ -50,8 +50,8 @@ export function Avatar({ user, size = 34 }) {
 
 // Top bar: hamburger → sidebar collapse · global search · live notification bell
 // (WebSocket) · running date & time · dark/bright toggle · profile menu with avatar.
-export default function Topbar({ collapsed, onToggle }) {
-  const { user, hasPermission, selectedLocation = 'All locations (BGV + DVG + SMG)', selectLocation, logout } = useAuth();
+export default function Topbar({ collapsed, onToggle, onOpenMobile }) {
+  const { user, hasPermission, selectedLocation = 'All Locations', selectLocation, logout } = useAuth();
   const cart = useCart();
   const navigate = useNavigate();
   const location = useLocation();
@@ -76,8 +76,8 @@ export default function Topbar({ collapsed, onToggle }) {
       if (!active) return;
       const divs = r.data?.data || [];
       if (user.isSuperAdmin || divs.length >= 3) {
-        const names = divs.length ? divs.map((d) => d.name) : ['Belagavi', 'Davangere', 'Shivamogga'];
-        setAvailableLocations(['All locations (BGV + DVG + SMG)', ...names]);
+        const names = divs.length ? divs.map((d) => d.name) : ['Belagavi', 'Davanagere', 'Shivamogga'];
+        setAvailableLocations(['All Locations', ...names]);
       } else if (divs.length > 0) {
         const names = divs.map((d) => d.name);
         setAvailableLocations(names);
@@ -281,12 +281,21 @@ export default function Topbar({ collapsed, onToggle }) {
 
   return (
     <header className="topbar" ref={boxRef}>
+      <button
+        type="button"
+        className="icon-btn mobile-menu-btn"
+        onClick={onOpenMobile}
+        aria-label="Open navigation menu"
+        title="Open menu"
+      >
+        <Icon name="menu" size={20} />
+      </button>
       <div className="topbar-search donezo-search">
         <Icon name="search" size={15} className="search-icon" />
         <input
           ref={searchRef}
           value={q}
-          placeholder="Search task"
+          placeholder="Search POs, products, suppliers, LR…"
           className="donezo-search-input"
           aria-label="Search purchase orders, products, suppliers and users"
           onChange={(e) => onSearch(e.target.value)}
@@ -416,7 +425,7 @@ export default function Topbar({ collapsed, onToggle }) {
           >
             <Icon name="location" size={15} className="location-btn-icon" />
             <span className="location-btn-text">
-              {selectedLocation === 'All locations (BGV + DVG + SMG)' ? 'Location' : selectedLocation}
+              {!selectedLocation || selectedLocation.toLowerCase().includes('all location') ? 'All Locations' : selectedLocation}
             </span>
             <Icon name="chevronDown" size={12} className={`location-btn-chevron ${openMenu === 'location' ? 'open' : ''}`} />
           </button>

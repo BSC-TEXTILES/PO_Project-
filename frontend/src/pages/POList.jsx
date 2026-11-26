@@ -122,15 +122,10 @@ export default function POList() {
 
   async function exportCsv() {
     try {
-      const params = new URLSearchParams();
-      Object.entries(filters).forEach(([k, v]) => { if (v) params.append(k, v); });
-      const token = localStorage.getItem('poms_token');
-      const res = await fetch(`${API_BASE}/purchase-orders/export/csv?${params.toString()}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!res.ok) throw new Error('Export failed');
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
+      const params = {};
+      Object.entries(filters).forEach(([k, v]) => { if (v) params[k] = v; });
+      const res = await api.get('/purchase-orders/export/csv', { params, responseType: 'blob' });
+      const url = window.URL.createObjectURL(res.data);
       const a = document.createElement('a');
       a.href = url;
       a.download = `purchase_orders_export_${new Date().toISOString().slice(0, 10)}.csv`;
@@ -139,7 +134,7 @@ export default function POList() {
       a.remove();
       window.URL.revokeObjectURL(url);
     } catch (e) {
-      setError(e.message || 'Export failed');
+      setError(errMessage(e));
     }
   }
 

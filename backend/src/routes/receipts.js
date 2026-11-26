@@ -99,9 +99,9 @@ r.post('/', requirePermission('receipt.create'), ah(async (req, res) => {
       }
 
       await client.query(
-        `INSERT INTO receipt_items (receipt_id, po_item_id, ordered_qty, received_qty, damaged_qty, rejected_qty, remarks)
-         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-        [rc.id, item.id, item.total_quantity, receivedQty, damagedQty, rejectedQty, line.remarks || null]);
+        `INSERT INTO receipt_items (receipt_id, po_item_id, ordered_qty, received_qty, damaged_qty, rejected_qty, accepted_qty, remarks)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [rc.id, item.id, item.total_quantity, receivedQty, damagedQty, rejectedQty, acceptedNow, line.remarks || null]);
     }
 
     if (post) await postReceipt(client, rc, po, req);

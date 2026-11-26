@@ -77,7 +77,11 @@ export function AuthProvider({ children }) {
     try { return localStorage.getItem('poms_selected_section') || null; } catch { return null; }
   });
   const [selectedLocation, setSelectedLocation] = useState(() => {
-    try { return localStorage.getItem('poms_selected_location') || 'All locations (BGV + DVG + SMG)'; } catch { return 'All locations (BGV + DVG + SMG)'; }
+    try {
+      const saved = localStorage.getItem('poms_selected_location');
+      if (!saved || saved.toLowerCase().includes('all location')) return 'All Locations';
+      return saved;
+    } catch { return 'All Locations'; }
   });
   const fetchedRef = useRef(false);
 
@@ -142,9 +146,9 @@ export function AuthProvider({ children }) {
 
   function clearLocation() {
     try {
-      localStorage.setItem('poms_selected_location', 'All locations (BGV + DVG + SMG)');
+      localStorage.setItem('poms_selected_location', 'All Locations');
     } catch { /* ignore */ }
-    setSelectedLocation('All locations (BGV + DVG + SMG)');
+    setSelectedLocation('All Locations');
   }
 
   // Sync local RBAC fields back after a profile update

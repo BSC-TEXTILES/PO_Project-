@@ -4,6 +4,8 @@ import api, { errMessage } from '../api.js';
 import { useAuth } from '../auth.jsx';
 import { Money } from '../components/DataTable.jsx';
 import Icon from '../components/Icon.jsx';
+import StatusChip from '../components/StatusChip.jsx';
+import DateRangeBar from '../components/DateRangeBar.jsx';
 import { DashboardSkeleton } from '../components/Skeletons.jsx';
 
 function fmtTime(d) {
@@ -314,39 +316,28 @@ function MainDashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [dashData, setDashData] = useState(null);
-  const [products, setProducts] = useState([]);
+  const [dateState, setDateState] = useState({ preset: 'all', from: '', to: '' });
   const [brands, setBrands] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [colours, setColours] = useState([]);
-  const [sizes, setSizes] = useState([]);
   const [manufacturers, setManufacturers] = useState([]);
-  const [notifications, setNotifications] = useState([]);
 
   // Fetch static master data once
   useEffect(() => {
     let active = true;
     Promise.allSettled([
-      api.get('/products?limit=5&sort=created_at&order=desc'),
       api.get('/brands'),
-      api.get('/categories'),
       api.get('/colours'),
-      api.get('/sizes'),
       api.get('/manufacturers?limit=100'),
-      api.get('/notifications'),
-    ]).then(([prodRes, brandRes, catRes, colorRes, sizeRes, mfgRes, notifRes]) => {
+    ]).then(([brandRes, colorRes, mfgRes]) => {
       if (!active) return;
-      if (prodRes.status === 'fulfilled') setProducts(prodRes.value.data?.data || []);
       if (brandRes.status === 'fulfilled') setBrands(brandRes.value.data?.data || []);
-      if (catRes.status === 'fulfilled') setCategories(catRes.value.data?.data || []);
       if (colorRes.status === 'fulfilled') setColours(colorRes.value.data?.data || []);
-      if (sizeRes.status === 'fulfilled') setSizes(sizeRes.value.data?.data || []);
       if (mfgRes.status === 'fulfilled') setManufacturers(mfgRes.value.data?.data || []);
-      if (notifRes.status === 'fulfilled') setNotifications(notifRes.value.data?.data || []);
     });
     return () => { active = false; };
   }, []);
 
-  // Fetch or re-fetch dashboard metrics whenever section or location filter changes
+  // Fetch or re-fetch dashboard metrics whenever section, location, or date filter changes
   useEffect(() => {
     let active = true;
     const fetchDashboard = async () => {
@@ -359,9 +350,11 @@ function MainDashboard() {
       try {
         const params = {};
         if (selectedSectionId) params.sectionId = selectedSectionId;
-        if (selectedLocation && selectedLocation !== 'All locations (BGV + DVG + SMG)') {
+        if (selectedLocation && !selectedLocation.toLowerCase().includes('all location')) {
           params.location = selectedLocation;
         }
+        if (dateState.from) params.from = dateState.from;
+        if (dateState.to) params.to = dateState.to;
 
         const dashRes = await api.get('/reports/dashboard', { params });
         if (active) {
@@ -380,13 +373,13 @@ function MainDashboard() {
 
     fetchDashboard();
     return () => { active = false; };
-  }, [selectedSectionId, selectedLocation]);
+  }, [selectedSectionId, selectedLocation, dateState.from, dateState.to]);
 
   if (loading && !dashData) return <DashboardSkeleton />;
   if (error && !dashData) {
     return (
       <div className="page" style={{ padding: '24px' }}>
-        <div className="card" style={{ maxWidth: 500, margin: '40px auto', textAlign: 'center', padding: 32, borderRadius: 16 }}>
+        <div className="card" style={{ maxWidth: 500, margin: '40px auto', textAlign: 'center', padding: 32, borderRadius: 12 }}>
           <div style={{ fontSize: 36, marginBottom: 12 }}>⚠️</div>
           <h3 style={{ margin: '0 0 8px', color: '#dc2626' }}>Failed to load dashboard metrics</h3>
           <p style={{ color: '#64748b', fontSize: 13, marginBottom: 20 }}>{error}</p>
@@ -398,158 +391,236 @@ function MainDashboard() {
   if (!dashData) return <div className="muted" style={{ padding: 24 }}>No data available</div>;
 
   const {
-    kpis = {}, byDivision = [], byStatus = [], bySection = [], bySupplier = [], recentAudit = [],
+    kpis = {}, byDivision = [], bySection = [], bySupplier = [], recentAudit = [],
     monthly = [], recentPOs = [], workProgress = {}, mySections = [],
+    lrSummary = {}, pendingApprovalList = [],
   } = dashData;
 
   const totalBrands = brands.length;
   const totalColors = colours.length;
-  const totalSizes = sizes.length;
   const totalManufacturers = manufacturers.length;
 
-  const completedOrders = workProgress.completed ?? 0;
+  const completedOrders = Number(workProgress.completed || 0);
+  const inProgressOrders = Number(kpis.issued || 0) + Number(kpis.partially_received || 0);
+  const pendingApprovalCount = Number(kpis.pending_approvals || 0);
   const workPct = workProgress.total ? (completedOrders / workProgress.total) * 100 : 0;
   const canMonitor = user.isSuperAdmin || hasPermission('audit.view');
   const canCreatePO = user.isSuperAdmin || hasPermission('po.create');
 
-  const greeting = () => {
-    const h = new Date().getHours();
-    if (h < 12) return 'Good Morning';
-    if (h < 17) return 'Good Afternoon';
-    return 'Good Evening';
-  };
-
-  const today = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const isFilteredLoc = selectedLocation && !selectedLocation.toLowerCase().includes('all location');
 
   return (
     <div className="page">
-      <div className="polist-head">
+      <div className="polist-head" style={{ marginBottom: 14 }}>
         <div>
-          <h1 className="page-title">Dashboard</h1>
-          <p className="page-sub">Plan, prioritize, and accomplish your tasks with ease.</p>
+          <h1 className="page-title">Operations Dashboard</h1>
+          <p className="page-sub" style={{ margin: 0 }}>Real-time procurement, store branch performance, and LR shipment overview</p>
           {!user.isSuperAdmin && !!mySections.length && (
-            <div className="row" style={{ marginTop: 4, gap: 6, alignItems: 'center' }}>
-              <span className="muted" style={{ fontSize: 12 }}>Your collections:</span>
+            <div className="row" style={{ marginTop: 6, gap: 6, alignItems: 'center' }}>
+              <span className="muted" style={{ fontSize: 12 }}>Assigned collections:</span>
               {mySections.map((s) => <span key={s.id} className="chip section-chip">{s.name}</span>)}
             </div>
           )}
           {selectedSectionId && (
             <div className="row" style={{ marginTop: 8, gap: 8, alignItems: 'center' }}>
-              <span className="chip polist-scope-pill">
-                Filtered by selected section
-              </span>
+              <span className="chip polist-scope-pill">Filtered by selected section</span>
               <button className="btn ghost sm" onClick={clearSection} title="Clear section filter">
                 <Icon name="x" size={14} /> Clear
               </button>
             </div>
           )}
-          {selectedLocation && selectedLocation !== 'All locations (BGV + DVG + SMG)' && (
+          {isFilteredLoc && (
             <div className="row" style={{ marginTop: 8, gap: 8, alignItems: 'center' }}>
-              <span className="chip polist-scope-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#f0fdf4', color: '#15803d', borderColor: '#bbf7d0' }}>
-                <Icon name="location" size={13} /> Location: <strong>{selectedLocation}</strong>
+              <span className="chip polist-scope-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#eff6ff', color: '#1d4ed8', borderColor: '#bfdbfe' }}>
+                <Icon name="location" size={13} /> Store: <strong>{selectedLocation}</strong>
               </span>
               <button className="btn ghost sm" onClick={clearLocation} title="Reset to all locations">
-                <Icon name="x" size={14} /> All locations
+                <Icon name="x" size={14} /> All Locations
               </button>
             </div>
           )}
         </div>
         <div className="polist-head-actions">
           {canCreatePO && (
-            <Link to="/purchase-orders/new" className="btn primary" style={{ borderRadius: 999, padding: '8px 16px', background: '#114224', border: 'none' }}>
-              + Add Order
+            <Link to="/purchase-orders/new" className="btn primary">
+              + Create Purchase Order
             </Link>
           )}
-          <Link to="/import-data" className="btn" style={{ borderRadius: 999, padding: '8px 16px', borderColor: '#114224', color: '#114224', fontWeight: 600 }}>
-            Import Data
-          </Link>
+          {hasPermission('import.manage') && (
+            <Link to="/import-data" className="btn">
+              Import Data
+            </Link>
+          )}
         </div>
       </div>
 
-      <div className={`donezo-kpis ${refreshing ? 'widget-updating' : ''}`} style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
-        <Link to="/purchase-orders" className="donezo-stat-card polist-card kpi-green" style={{ textDecoration: 'none' }}>
-          <div className="st-head">
-            <span>Total Orders</span>
-            {refreshing ? <span className="widget-updating-badge">Updating…</span> : <div className="st-arrow">↗</div>}
-          </div>
-          <div className="st-val">{refreshing ? <span className="kpi-skeleton">…</span> : (kpis.total_pos || 0)}</div>
-          <div className="st-note"><span className="st-up">↑</span> View all purchase orders</div>
+      {/* Date Range Filters */}
+      <DateRangeBar preset={dateState.preset} from={dateState.from} to={dateState.to} onChange={setDateState}>
+        {refreshing && <span className="muted" style={{ fontSize: 12, marginLeft: 'auto' }}>Refreshing…</span>}
+      </DateRangeBar>
+
+      {/* Primary KPI Strip */}
+      <div className={`ent-kpi-grid ${refreshing ? 'widget-updating' : ''}`}>
+        <Link to="/purchase-orders" className="ent-kpi-card">
+          <div className="ent-kpi-label"><span>Total Purchase Orders</span><span>↗</span></div>
+          <div className="ent-kpi-val">{Number(kpis.total_pos || 0).toLocaleString('en-IN')}</div>
+          <div className="ent-kpi-sub">Total Value: <strong>{inrCompact(kpis.total_value)}</strong></div>
         </Link>
-        <Link to="/purchase-orders?status=received" className="donezo-stat-card polist-card" style={{ textDecoration: 'none' }}>
-          <div className="st-head">
-            <span>Ended Orders</span>
-            {refreshing ? <span className="widget-updating-badge">Updating…</span> : <div className="st-arrow">↗</div>}
-          </div>
-          <div className="st-val">{refreshing ? <span className="kpi-skeleton">…</span> : completedOrders}</div>
-          <div className="st-note"><span className="st-up">↑</span> Completed / Received orders</div>
+
+        <Link to="/purchase-orders?status=received" className="ent-kpi-card ok">
+          <div className="ent-kpi-label"><span>Received & Closed</span><span>↗</span></div>
+          <div className="ent-kpi-val">{completedOrders.toLocaleString('en-IN')}</div>
+          <div className="ent-kpi-sub">{workPct.toFixed(0)}% of total orders completed</div>
         </Link>
-        <Link to="/purchase-orders?status=issued" className="donezo-stat-card polist-card" style={{ textDecoration: 'none' }}>
-          <div className="st-head">
-            <span>Running Orders</span>
-            {refreshing ? <span className="widget-updating-badge">Updating…</span> : <div className="st-arrow">↗</div>}
-          </div>
-          <div className="st-val">{refreshing ? <span className="kpi-skeleton">…</span> : (kpis.pending_approvals || 0)}</div>
-          <div className="st-note"><span className="st-up">↑</span> Issued & in-progress orders</div>
+
+        <Link to="/purchase-orders?status=issued" className="ent-kpi-card info">
+          <div className="ent-kpi-label"><span>Issued / In Transit</span><span>↗</span></div>
+          <div className="ent-kpi-val">{inProgressOrders.toLocaleString('en-IN')}</div>
+          <div className="ent-kpi-sub">Active orders awaiting delivery</div>
         </Link>
-        <Link to="/purchase-orders?status=draft" className="donezo-stat-card polist-card" style={{ textDecoration: 'none' }}>
-          <div className="st-head">
-            <span>Pending Orders</span>
-            {refreshing ? <span className="widget-updating-badge">Updating…</span> : <div className="st-arrow">↗</div>}
-          </div>
-          <div className="st-val">{refreshing ? <span className="kpi-skeleton">…</span> : (workProgress.drafts || 0)}</div>
-          <div className="st-note">Drafts awaiting submission</div>
+
+        <Link to="/approvals" className="ent-kpi-card warn">
+          <div className="ent-kpi-label"><span>Pending Approval</span><span>↗</span></div>
+          <div className="ent-kpi-val">{pendingApprovalCount.toLocaleString('en-IN')}</div>
+          <div className="ent-kpi-sub">{Number(workProgress.drafts || 0)} drafts awaiting submission</div>
         </Link>
       </div>
 
-      {/* Location-Wise Store Comparison (Belagavi, Davanagere, Shivamogga) */}
-      <div className="card" style={{ marginBottom: 24, padding: '20px 22px', borderRadius: 16 }}>
+      {/* Store Branch Performance (Belagavi, Davanagere, Shivamogga) */}
+      <div className="card" style={{ marginBottom: 20, padding: '18px 20px', borderRadius: 12 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
           <div>
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>Store Branch Performance</h3>
-            <span style={{ fontSize: 12, color: 'var(--muted)' }}>Live order distribution across Belagavi, Davanagere, and Shivamogga stores</span>
+            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--ink)' }}>Store Branch Performance</h3>
+            <span style={{ fontSize: 12, color: 'var(--muted)' }}>Purchase order distribution across Belagavi, Davanagere, and Shivamogga</span>
           </div>
           <Link to="/lr-tracking" className="btn sm" style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600 }}>
             <Icon name="truck" size={14} /> LR Tracking Hub →
           </Link>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
           {(byDivision.length ? byDivision : [
-            { code: 'BEL', name: 'Belagavi Store', pos: 0, value: 0 },
-            { code: 'DAV', name: 'Davanagere Store', pos: 0, value: 0 },
-            { code: 'SHI', name: 'Shivamogga Store', pos: 0, value: 0 }
+            { code: 'BLG', name: 'Belagavi', pos: 0, value: 0 },
+            { code: 'DVG', name: 'Davanagere', pos: 0, value: 0 },
+            { code: 'SMG', name: 'Shivamogga', pos: 0, value: 0 },
           ]).map((div) => (
             <div
               key={div.code || div.name}
               className="card clickable"
               onClick={() => navigate(`/purchase-orders?search=${encodeURIComponent(div.code || div.name)}`)}
               style={{
-                padding: '16px 18px',
-                borderRadius: 12,
-                border: '1px solid #e2e8f0',
-                background: '#f8fafc',
+                padding: '14px 16px',
+                borderRadius: 10,
+                border: '1px solid var(--line)',
+                background: 'var(--bg)',
                 cursor: 'pointer',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 6
+                gap: 4,
               }}
               title={`Click to filter purchase orders for ${div.name}`}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontWeight: 700, fontSize: 13, color: '#1e40af' }}>{div.name}</span>
+                <span style={{ fontWeight: 700, fontSize: 13.5, color: '#1e40af' }}>{div.name}</span>
                 <span className="chip" style={{ fontSize: 11, fontWeight: 700, background: '#dbeafe', color: '#1d4ed8' }}>{div.code || 'STORE'}</span>
               </div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink)' }}>{div.pos} <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--muted)' }}>orders</span></div>
-              <div style={{ fontSize: 12, color: '#059669', fontWeight: 600 }}>Total: {inrCompact(div.value)}</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--ink)' }}>{div.pos} <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--muted)' }}>orders</span></div>
+              <div style={{ fontSize: 12, color: '#15803d', fontWeight: 600 }}>Value: {inrCompact(div.value)}</div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Quick Actions — permission-aware shortcut tiles */}
-      <div className="quick-actions-panel">
+      {/* Action Center: Pending Approvals + LR Shipment Alerts */}
+      <div className="dash-grid two" style={{ marginBottom: 20 }}>
+        <div className="card">
+          <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>Pending Approvals & Tasks</span>
+            <Link to="/approvals" className="btn sm">View Queue →</Link>
+          </div>
+          {pendingApprovalList.length > 0 ? (
+            <div className="table-responsive">
+              <table className="grid">
+                <thead><tr><th>PO Number</th><th>Store</th><th>Supplier</th><th className="num">Amount</th><th>Status</th></tr></thead>
+                <tbody>
+                  {pendingApprovalList.map((p) => (
+                    <tr key={p.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/purchase-orders/${p.id}`)}>
+                      <td className="mono" style={{ fontWeight: 600, color: '#1d4ed8' }}>{p.po_number}</td>
+                      <td>{p.division_name}</td>
+                      <td>{p.supplier_name}</td>
+                      <td className="num"><Money value={p.grand_total} /></td>
+                      <td><StatusChip status={p.status} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="muted" style={{ padding: '16px 0', fontSize: 13 }}>No purchase orders currently awaiting approval.</div>
+          )}
+        </div>
+
+        <div className="card">
+          <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>LR Tracking & Delivery Alerts</span>
+            <Link to="/lr-tracking/track" className="btn sm">Track Orders →</Link>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginTop: 8 }}>
+            <Link to="/lr-tracking/track" className="ent-kpi-card info" style={{ padding: '12px 14px' }}>
+              <div className="ent-kpi-label">In Transit</div>
+              <div className="ent-kpi-val" style={{ fontSize: 22 }}>{Number(lrSummary.in_transit || 0)}</div>
+            </Link>
+            <Link to="/lr-tracking/receiving" className="ent-kpi-card warn" style={{ padding: '12px 14px' }}>
+              <div className="ent-kpi-label">Pending Store Receipt</div>
+              <div className="ent-kpi-val" style={{ fontSize: 22 }}>{Number(lrSummary.pending_receipt || 0)}</div>
+            </Link>
+            <Link to="/lr-tracking/track" className="ent-kpi-card ok" style={{ padding: '12px 14px' }}>
+              <div className="ent-kpi-label">Delivered</div>
+              <div className="ent-kpi-val" style={{ fontSize: 22 }}>{Number(lrSummary.delivered || 0)}</div>
+            </Link>
+            <Link to="/lr-tracking/track" className="ent-kpi-card danger" style={{ padding: '12px 14px' }}>
+              <div className="ent-kpi-label">Delayed / Exceptions</div>
+              <div className="ent-kpi-val" style={{ fontSize: 22 }}>{Number(lrSummary.delayed_count || 0) + Number(lrSummary.exceptions || 0)}</div>
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Recent Purchase Orders Table */}
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>Recent Purchase Orders</span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {canCreatePO && <Link to="/purchase-orders/new" className="btn sm primary">+ New PO</Link>}
+            <Link to="/purchase-orders" className="btn sm">View All →</Link>
+          </div>
+        </div>
+        <div className="table-responsive">
+          <table className="grid">
+            <thead><tr><th>PO Number</th><th>Date</th><th>Store</th><th>Collection</th><th>Supplier</th><th className="num">Qty</th><th className="num">Grand Total</th><th>Status</th></tr></thead>
+            <tbody>
+              {recentPOs.map((p) => (
+                <tr key={p.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/purchase-orders/${p.id}`)}>
+                  <td className="mono" style={{ fontWeight: 600, color: '#1d4ed8' }}>{p.po_number}</td>
+                  <td>{p.po_date ? new Date(p.po_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
+                  <td>{p.division_name}</td>
+                  <td>{p.section_name}</td>
+                  <td>{p.supplier_name}</td>
+                  <td className="num">{Number(p.total_quantity || 0).toLocaleString('en-IN')}</td>
+                  <td className="num"><strong><Money value={p.grand_total} /></strong></td>
+                  <td><StatusChip status={p.status} /></td>
+                </tr>
+              ))}
+              {!recentPOs.length && <tr><td colSpan={8} className="muted" style={{ textAlign: 'center', padding: 20 }}>No purchase orders found for the selected filters.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="quick-actions-panel" style={{ marginBottom: 20 }}>
         <div className="qap-header">
           <h2 className="qap-title">Quick Actions</h2>
-          <span className="qap-sub">Frequent tasks, one click away</span>
+          <span className="qap-sub">Frequent workflows, one click away</span>
         </div>
         <div className="qa-grid">
           {hasPermission('products.create') && (
@@ -562,16 +633,14 @@ function MainDashboard() {
               <Icon name="arrowRight" size={14} className="qa-tile-arrow" />
             </Link>
           )}
-          {hasPermission('categories.manage') && (
-            <Link to="/categories" className="qa-tile">
-              <span className="qa-tile-icon green"><Icon name="masters" size={17} /></span>
-              <span className="qa-tile-body">
-                <span className="qa-tile-title">Manage Categories</span>
-                <span className="qa-tile-desc">Organise the product catalogue</span>
-              </span>
-              <Icon name="arrowRight" size={14} className="qa-tile-arrow" />
-            </Link>
-          )}
+          <Link to="/lr-tracking/upload" className="qa-tile">
+            <span className="qa-tile-icon green"><Icon name="camera" size={17} /></span>
+            <span className="qa-tile-body">
+              <span className="qa-tile-title">Upload LR Document</span>
+              <span className="qa-tile-desc">OCR scan & link lorry receipt</span>
+            </span>
+            <Icon name="arrowRight" size={14} className="qa-tile-arrow" />
+          </Link>
           <Link to="/purchase-orders" className="qa-tile">
             <span className="qa-tile-icon amber"><Icon name="po" size={17} /></span>
             <span className="qa-tile-body">
@@ -584,18 +653,8 @@ function MainDashboard() {
             <Link to="/reports" className="qa-tile">
               <span className="qa-tile-icon violet"><Icon name="reports" size={17} /></span>
               <span className="qa-tile-body">
-                <span className="qa-tile-title">Reports</span>
-                <span className="qa-tile-desc">Export data as CSV or PDF</span>
-              </span>
-              <Icon name="arrowRight" size={14} className="qa-tile-arrow" />
-            </Link>
-          )}
-          {hasPermission('settings.manage') && (
-            <Link to="/settings" className="qa-tile">
-              <span className="qa-tile-icon slate"><Icon name="settings" size={17} /></span>
-              <span className="qa-tile-body">
-                <span className="qa-tile-title">Settings</span>
-                <span className="qa-tile-desc">System preferences and access</span>
+                <span className="qa-tile-title">Reports & Export</span>
+                <span className="qa-tile-desc">Download Excel, PDF or CSV</span>
               </span>
               <Icon name="arrowRight" size={14} className="qa-tile-arrow" />
             </Link>
@@ -603,86 +662,42 @@ function MainDashboard() {
         </div>
       </div>
 
-      <div className="dash-grid three" style={{ marginBottom: 24 }}>
-        <div className={`card analytics-card ${refreshing ? 'widget-updating' : ''}`} style={{ gridColumn: 'span 1' }}>
-          <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>Order Analytics</span>
-            {refreshing && <span className="widget-updating-badge">Updating…</span>}
-          </div>
+      {/* Analytics Row */}
+      <div className="dash-grid two" style={{ marginBottom: 20 }}>
+        <div className={`card analytics-card ${refreshing ? 'widget-updating' : ''}`}>
+          <div className="card-title">Monthly Order Volume (12 Months)</div>
           <MonthlyHBar data={monthly} />
         </div>
 
-        <div className="card reminder-card" style={{ gridColumn: 'span 1' }}>
-          <div className="card-title">Reminders</div>
-          <h3 style={{ margin: '12px 0 4px', fontSize: 18, color: '#111827' }}>Meeting with Arc Company</h3>
-          <div className="muted" style={{ marginBottom: 16 }}>Time : 02.00 pm - 04.00 pm</div>
-          <button className="btn primary" style={{ width: '100%', background: '#175e3a', border: 'none', borderRadius: 999, padding: 12 }}>
-            <Icon name="video" size={16} /> Start Meeting
-          </button>
-        </div>
-
-        <div className={`card projects-card ${refreshing ? 'widget-updating' : ''}`} style={{ gridColumn: 'span 1' }}>
-          <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>Orders</span>
-            {refreshing ? <span className="widget-updating-badge">Updating…</span> : <button className="btn sm" style={{ borderRadius: 999 }}>+ New</button>}
-          </div>
-          <div className="donezo-proj-list" style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
-            {recentPOs.slice(0, 4).map((p, i) => (
-              <div key={p.id} className="donezo-proj-item" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span className="proj-icon" style={{ background: ['#e0e7ff', '#d1fae5', '#fef3c7', '#ffedd5'][i % 4], width: 36, height: 36, borderRadius: 8, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-                  <Icon name="po" size={16} style={{ color: ['#4f46e5', '#10b981', '#f59e0b', '#f97316'][i % 4] }} />
-                </span>
-                <div>
-                  <strong style={{ fontSize: 13, color: 'var(--ink)' }}>{p.section_name} Setup</strong>
-                  <div className="muted" style={{ fontSize: 11 }}>Due date: Nov 26, 2024</div>
-                </div>
-              </div>
-            ))}
-            {!recentPOs.length && <div className="muted">No recent projects</div>}
+        <div className={`card progress-card ${refreshing ? 'widget-updating' : ''}`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="card-title" style={{ alignSelf: 'flex-start', width: '100%' }}>Order Completion Ratio</div>
+          <div style={{ margin: '14px 0' }}><ProgressRing pct={workPct} /></div>
+          <div className="donezo-legend" style={{ display: 'flex', gap: 14, fontSize: 12, fontWeight: 600, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#16a34a' }} />Completed ({completedOrders})</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#f59e0b' }} />In Progress ({inProgressOrders})</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#64748b' }} />Pending ({pendingApprovalCount})</span>
           </div>
         </div>
       </div>
 
-      <div className="dash-grid three" style={{ marginBottom: 24 }}>
-        <div className="card team-card" style={{ gridColumn: 'span 2' }}>
-          <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            Team Collaboration <button className="btn sm" style={{ borderRadius: 999 }}>+ Add Member</button>
-          </div>
+      {canMonitor && (
+        <div style={{ marginBottom: 20 }}>
           <LivePanel />
         </div>
-
-        <div className={`card progress-card ${refreshing ? 'widget-updating' : ''}`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          <div className="card-title" style={{ alignSelf: 'flex-start', width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>Project Progress</span>
-            {refreshing && <span className="widget-updating-badge">Updating…</span>}
-          </div>
-          <div style={{ transform: 'scale(1.2)', margin: '20px 0' }}><ProgressRing pct={workPct} /></div>
-          <div className="donezo-legend" style={{ display: 'flex', gap: 12, fontSize: 11, fontWeight: 600 }}>
-            <span className="dl-dot ok" style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#16a34a' }}></span>Completed</span>
-            <span className="dl-dot in" style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#f59e0b' }}></span>In Progress</span>
-            <span className="dl-dot pd" style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#64748b' }}></span>Pending</span>
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* Collection Share + Top Suppliers */}
-      <div className={`dash-grid two ${refreshing ? 'widget-updating' : ''}`} style={{ marginBottom: 24 }}>
+      <div className={`dash-grid two ${refreshing ? 'widget-updating' : ''}`} style={{ marginBottom: 20 }}>
         <div className="card">
-          <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>Collection-wise Share of Order Value</span>
-            {refreshing && <span className="widget-updating-badge">Updating…</span>}
-          </div>
+          <div className="card-title">Collection-wise Share of Order Value</div>
           <CollectionShareBars data={bySection} />
         </div>
         <div className="card">
-          <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>Top Suppliers</span>
-            {refreshing && <span className="widget-updating-badge">Updating…</span>}
-          </div>
+          <div className="card-title">Top Suppliers</div>
           <div className="info-list">
             {bySupplier.slice(0, 6).map((s, i) => (
               <div key={s.company_name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--line)' }}>
-                <span style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--brand-ink)', color: '#fff', display: 'inline-grid', placeItems: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{i + 1}</span>
+                <span style={{ width: 26, height: 26, borderRadius: '50%', background: '#1d4ed8', color: '#fff', display: 'inline-grid', placeItems: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{i + 1}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--ink)' }}>{s.company_name}</div>
                   <div style={{ fontSize: 11, color: 'var(--muted)' }}>{s.pos} orders</div>
@@ -695,52 +710,51 @@ function MainDashboard() {
         </div>
       </div>
 
-      {/* Brand line-up — real uploaded logos, aligned tiles */}
       <BrandStrip brands={brands} />
 
       {/* Master Data Summary */}
-      <div className="dash-grid three master-summary-grid" style={{ marginBottom: 24 }}>
+      <div className="dash-grid three master-summary-grid" style={{ marginBottom: 20 }}>
         <div className="card master-stat-card">
           <div className="card-title">Brands</div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
-              <div style={{ fontSize: 30, fontWeight: 800, color: 'var(--ink)' }}>{totalBrands}</div>
+              <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--ink)' }}>{totalBrands}</div>
               <div style={{ fontSize: 12, color: 'var(--muted)' }}>Active brands</div>
             </div>
-            <Link to="/brands" className="btn sm accent">View All →</Link>
+            <Link to="/brands" className="btn sm primary">View All →</Link>
           </div>
         </div>
         <div className="card master-stat-card">
           <div className="card-title">Colors</div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
-              <div style={{ fontSize: 30, fontWeight: 800, color: 'var(--ink)' }}>{totalColors}</div>
+              <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--ink)' }}>{totalColors}</div>
               <div style={{ fontSize: 12, color: 'var(--muted)' }}>Available colors</div>
             </div>
-            <Link to="/colors" className="btn sm accent">View All →</Link>
+            <Link to="/colors" className="btn sm primary">View All →</Link>
           </div>
         </div>
         <div className="card master-stat-card">
           <div className="card-title">Manufacturers</div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
-              <div style={{ fontSize: 30, fontWeight: 800, color: 'var(--ink)' }}>{totalManufacturers}</div>
+              <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--ink)' }}>{totalManufacturers}</div>
               <div style={{ fontSize: 12, color: 'var(--muted)' }}>Active manufacturers</div>
             </div>
-            <Link to="/manufacturers" className="btn sm accent">View All →</Link>
+            <Link to="/manufacturers" className="btn sm primary">View All →</Link>
           </div>
         </div>
       </div>
 
       {/* Recent Activity */}
-      <div className="card recent-activity-card" style={{ marginBottom: 24 }}>
-        <div className="card-title">Recent Activity</div>
+      <div className="card recent-activity-card" style={{ marginBottom: 20 }}>
+        <div className="card-title">Recent Audit Activity</div>
         <ul className="timeline">
           {recentAudit.slice(0, 8).map((a, i) => (
             <li key={i}>
               <div className="t-time">{fmtTime(a.occurred_at)}</div>
               <strong>{a.action_type}</strong> on {a.entity_type.replace(/_/g, ' ')} — {a.actor}
-              {a.entity_type === 'purchase_order' && <Link className="btn sm accent right" style={{ marginLeft: 8 }} to={`/purchase-orders/${a.entity_id}`}>View</Link>}
+              {a.entity_type === 'purchase_order' && <Link className="btn sm right" style={{ marginLeft: 8 }} to={`/purchase-orders/${a.entity_id}`}>View</Link>}
             </li>
           ))}
           {!recentAudit.length && <li className="muted">No activity yet.</li>}

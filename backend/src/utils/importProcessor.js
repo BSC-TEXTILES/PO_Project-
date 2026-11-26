@@ -4,6 +4,7 @@
 // re-validates everything at that point).
 
 import { withTransaction, newId, nextNumber } from '../config/db.js';
+import { computeProductProfit } from './pricing.js';
 import {
   mapField, productFieldOptions, defaultMappingFromHeaders,
   normalizeTax, parsePrice, normalizeStatus, normKey,
@@ -236,10 +237,12 @@ export async function executeImport(userId, importId, records) {
           updated_by: userId,
         };
 
+        const { profitAmount, profitMargin } = computeProductProfit(mapped.purchase_price, mapped.selling_price);
         if (rec.action === 'update' && rec.existingId) {
           await client.query(
             `UPDATE products SET name=$2, brand_id=$3, section_id=$4, category_id=$5,
               hsn_sac=$6, tax_category=$7, purchase_price=$8, selling_price=$9,
+              profit_amount=$17, profit_margin=$18,
               barcode=$10, internal_ref=$11, material=$12, collection=$13, gender=$14, status=$15,
               updated_by=$16, updated_at=now()
              WHERE id=$1`,
@@ -250,6 +253,7 @@ export async function executeImport(userId, importId, records) {
               mapped.barcode, mapped.internal_ref, mapped.material, mapped.collection,
               mapped.gender, mapped.status,
               mapped.updated_by,
+              profitAmount, profitMargin,
             ]);
           const { rows } = await client.query(`SELECT id FROM products WHERE id = $1`, [rec.existingId]);
           if (rows[0]) {
@@ -263,15 +267,16 @@ export async function executeImport(userId, importId, records) {
           const productSerial = await nextNumber(client, 'PRD', null, year);
           await client.query(
             `INSERT INTO products (id, product_serial, sku, name, brand_id, section_id, category_id, hsn_sac, tax_category,
-              purchase_price, selling_price, barcode, internal_ref, material, collection, gender, status,
+              purchase_price, selling_price, profit_amount, profit_margin, barcode, internal_ref, material, collection, gender, status,
               attributes, created_by, updated_by)
-             VALUES ($18, $19, $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$17)`,
+             VALUES ($18, $19, $1,$2,$3,$4,$5,$6,$7,$8,$9,$20,$21,$10,$11,$12,$13,$14,$15,$16,$17,$17)`,
             [
               mapped.sku, mapped.name, mapped.brand_id, mapped.section_id, mapped.category_id,
               mapped.hsn_sac, mapped.tax_category, mapped.purchase_price, mapped.selling_price,
               mapped.barcode, mapped.internal_ref, mapped.material, mapped.collection,
               mapped.gender, mapped.status,
-              JSON.stringify(mapped.attributes), mapped.created_by, newProductId, productSerial]);
+              JSON.stringify(mapped.attributes), mapped.created_by, newProductId, productSerial,
+              profitAmount, profitMargin]);
           const { rows } = await client.query(`SELECT id FROM products WHERE id = $1`, [newProductId]);
           if (rows[0]) {
             row.operation = 'create';

@@ -56,15 +56,20 @@ function StatusBadges({ brand }) {
 }
 
 export default function BrandWiseDashboard() {
-  const { hasPermission, user } = useAuth();
+  const { selectedLocation } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState('');
   const [data, setData] = useState(null);
 
   useEffect(() => {
     let active = true;
-    api.get('/reports/brand-wise')
+    const params = {};
+    if (selectedLocation && !selectedLocation.toLowerCase().includes('all location')) {
+      params.location = selectedLocation;
+    }
+    api.get('/reports/brand-wise', { params })
       .then((r) => {
         if (active) {
           setData(r.data);
@@ -78,7 +83,30 @@ export default function BrandWiseDashboard() {
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, []);
+  }, [selectedLocation]);
+
+  async function handleExportCsv() {
+    setExporting(true);
+    try {
+      const params = { format: 'csv' };
+      if (selectedLocation && !selectedLocation.toLowerCase().includes('all location')) {
+        params.location = selectedLocation;
+      }
+      const res = await api.get('/reports/brand-wise', { params, responseType: 'blob' });
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `brand_wise_po_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(errMessage(e));
+    } finally {
+      setExporting(false);
+    }
+  }
 
   if (loading && !data) return <DashboardSkeleton />;
   if (error) return <div className="page"><div className="alert error">{error}</div></div>;
@@ -97,15 +125,15 @@ export default function BrandWiseDashboard() {
           <button className="btn sm" onClick={() => window.print()} title="Print this dashboard">
             <Icon name="file" size={14} /> Print
           </button>
-          <a
-            href="/reports/brand-wise?format=csv"
-            className="btn sm"
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            type="button"
+            className="btn sm primary"
+            onClick={handleExportCsv}
+            disabled={exporting}
             title="Export brand-wise data as CSV"
           >
-            <Icon name="download" size={14} /> Export CSV
-          </a>
+            <Icon name="download" size={14} /> {exporting ? 'Exporting…' : 'Export CSV'}
+          </button>
         </div>
       </div>
 
