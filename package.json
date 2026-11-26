@@ -4,12 +4,34 @@
   "type": "module",
   "description": "BSC Exclusive Purchase Order Management System (POMS)",
   "private": true,
-  "main": "server.cjs",
+  "main": "server.js",
   "scripts": {
-    "start": "node server.cjs",
+    "start": "node server.js",
     "backend": "npm start --prefix backend",
     "frontend": "npm run dev --prefix frontend",
     "build": "npm run build --prefix frontend",
     "test": "npm test --prefix backend"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "multer": "^2.3.0",
+    "mysql2": "^3.24.6",
+    "pdf-parse": "^2.4.5",
+    "qrcode": "^1.5.4",
+    "tesseract.js": "^7.0.0",
+    "ws": "^8.21.3",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+    "zod": "^4.6.2"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2"
+  },
+  "overrides": {
+    "qs": "^6.17.1"
   }
 }

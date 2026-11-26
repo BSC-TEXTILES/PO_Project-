@@ -29,7 +29,7 @@ export default function Categories() {
       .then((r) => setRows(r.data.data || []))
       .catch((e) => setError(errMessage(e)))
       .finally(() => setLoading(false));
-    api.get('/sections').then((r) => setSections(r.data.data || [])).catch(() => {});
+    api.get('/sections').then((r) => setSections(r.data.data || [])).catch(() => { });
   };
   useEffect(load, [sectionFilter]);
 
@@ -116,27 +116,27 @@ export default function Categories() {
       </div>
       {modal && (
         <Modal title="Add Category" onClose={() => setModal(null)}>
-            <label className="field"><span className="field-label">Section *</span>
-              <select value={form.sectionId} onChange={(e) => setForm({ ...form, sectionId: e.target.value })}>
-                <option value="">— select —</option>
-                {sections.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            </label>
-            <label className="field"><span className="field-label">Parent Category</span>
-              <select value={form.parentCategoryId} onChange={(e) => setForm({ ...form, parentCategoryId: e.target.value })}>
-                <option value="">— none (top-level) —</option>
-                {PARENT_CATEGORY_OPTIONS.map((cat) => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-                {rows
-                  .filter((c) => c.section_id === form.sectionId && !PARENT_CATEGORY_OPTIONS.includes(c.name))
-                  .map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
-              </select>
-            </label>
-            <div className="fields-2">
-              <label className="field"><span className="field-label">Code *</span><input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} /></label>
-              <label className="field"><span className="field-label">Name *</span><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
-            </div>
+          <label className="field"><span className="field-label">Section *</span>
+            <select value={form.sectionId} onChange={(e) => setForm({ ...form, sectionId: e.target.value })}>
+              <option value="">— select —</option>
+              {sections.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </label>
+          <label className="field"><span className="field-label">Parent Category</span>
+            <select value={form.parentCategoryId} onChange={(e) => setForm({ ...form, parentCategoryId: e.target.value })}>
+              <option value="">— none (top-level) —</option>
+              {PARENT_CATEGORY_OPTIONS.map((cat) => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+              {rows
+                .filter((c) => c.section_id === form.sectionId && !PARENT_CATEGORY_OPTIONS.includes(c.name))
+                .map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+            </select>
+          </label>
+          <div className="fields-2">
+            <label className="field"><span className="field-label">Code *</span><input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} /></label>
+            <label className="field"><span className="field-label">Name *</span><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
+          </div>
           <div className="modal-actions">
             <button className="btn" onClick={() => setModal(null)}>Cancel</button>
             <button className="btn primary" onClick={save} disabled={saving || !form.sectionId || !form.code || !form.name}>{saving ? 'Saving…' : 'Save'}</button>

@@ -21,12 +21,15 @@ export function resolveDbConfig(env = process.env) {
   if (env.DB_HOST || env.DB_NAME || env.DB_USER) {
     const rawUser = env.DB_USER || '';
     const rawDb = env.DB_NAME || '';
+    const host = (process.platform === 'linux' && env.DB_HOST && env.DB_HOST.includes('.hstgr.io'))
+      ? 'localhost'
+      : (env.DB_HOST || 'localhost');
     cfg = {
-      host: env.DB_HOST || 'localhost',
+      host,
       port: parseInt(env.DB_PORT || '3306', 10),
-      user: /^u\d+_/i.test(rawUser) ? rawUser.toLowerCase() : rawUser,
+      user: rawUser,
       password: env.DB_PASSWORD ?? '',
-      database: /^u\d+_/i.test(rawDb) ? rawDb.toLowerCase() : rawDb,
+      database: rawDb,
     };
   } else if (env.DATABASE_URL) {
     let u;

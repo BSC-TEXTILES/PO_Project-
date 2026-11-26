@@ -93,15 +93,23 @@ export async function ensureMigrations() {
     return;
   }
   const cfg = resolveDbConfig();
-  const candidateHosts = [cfg.host];
-  if (cfg.host !== 'localhost' && cfg.host !== '127.0.0.1') {
-    candidateHosts.push('localhost', '127.0.0.1');
-  }
+  const isLinuxOrRemote = process.platform === 'linux' || !cfg.host || cfg.host.includes('.hstgr.io');
+  const candidateHosts = isLinuxOrRemote
+    ? ['localhost', '127.0.0.1', cfg.host].filter((h, i, a) => Boolean(h) && a.indexOf(h) === i)
+    : [cfg.host, 'localhost', '127.0.0.1'].filter((h, i, a) => Boolean(h) && a.indexOf(h) === i);
 
   let conn;
   let lastErr = null;
+  const baseUser = cfg.user || 'u101820758_PO_1';
+  const baseDb = cfg.database || 'u101820758_PO_PROJECT_1';
+
   const candidateCreds = [
-    { user: cfg.user, db: cfg.database },
+    { user: baseUser, db: baseDb },
+    { user: baseDb, db: baseUser },
+    { user: 'u101820758_PO_1', db: 'u101820758_PO_PROJECT_1' },
+    { user: 'u101820758_PO_PROJECT_1', db: 'u101820758_PO_1' },
+    { user: 'u101820758_po_1', db: 'u101820758_po_project_1' },
+    { user: 'u101820758_po_project_1', db: 'u101820758_po_1' },
     { user: cfg.user.replace(/_1$/i, ''), db: cfg.database.replace(/_1$/i, '') },
     { user: `${cfg.user}_1`, db: `${cfg.database}_1` },
   ].filter((c, i, a) => a.findIndex((x) => x.user.toLowerCase() === c.user.toLowerCase() && x.db.toLowerCase() === c.db.toLowerCase()) === i);
@@ -112,7 +120,7 @@ export async function ensureMigrations() {
         conn = await mysql.createConnection({
           host, port: cfg.port, user: cred.user, password: cfg.password,
           database: cred.db, ssl: cfg.ssl, timezone: 'Z', multipleStatements: false,
-          connectTimeout: 5000,
+          connectTimeout: 2500,
         });
         cfg.host = host;
         cfg.user = cred.user;

@@ -64,7 +64,7 @@ function createPool(host = cfg.host, user = cfg.user, database = cfg.database) {
     maxIdle: cfg.connectionLimit,
     idleTimeout: 60_000,
     queueLimit: 0,
-    connectTimeout: 5_000,
+    connectTimeout: 2_500,
     enableKeepAlive: true,
     keepAliveInitialDelay: 10_000,
     multipleStatements: false,
@@ -79,20 +79,36 @@ function createPool(host = cfg.host, user = cfg.user, database = cfg.database) {
 let rawPool = createPool(cfg.host);
 
 const CONNECTION_ERRORS = new Set([
-  'ER_ACCESS_DENIED_ERROR', 'ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND',
-  'EAI_AGAIN', 'PROTOCOL_CONNECTION_LOST', 'ER_BAD_DB_ERROR',
+  'ER_ACCESS_DENIED_ERROR', 'ER_ACCESS_DENIED_NO_PASSWORD_ERROR', 'ER_DBACCESS_DENIED_ERROR',
+  'ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND', 'EAI_AGAIN', 'PROTOCOL_CONNECTION_LOST',
+  'ER_BAD_DB_ERROR', 'ECONNRESET', 'EPIPE', 'ER_HOST_NOT_PRIVILEGED', 'ER_HOST_IS_BLOCKED',
+  'ER_CON_COUNT_ERROR',
 ]);
 
 let fallbackPromise = null;
-async function tryFallback() {
+export async function tryFallback() {
   if (fallbackPromise) return fallbackPromise;
   fallbackPromise = (async () => {
-    // When deployed on Hostinger, MySQL is local: prioritize localhost and 127.0.0.1 over remote domain
-    const candidateHosts = [cfg.host, 'localhost', '127.0.0.1'].filter((h, i, a) => Boolean(h) && a.indexOf(h) === i);
+    // When deployed on Hostinger/Linux or when remote host is set, prioritize local fast connection
+    const isLinuxOrRemote = process.platform === 'linux' || !cfg.host || cfg.host.includes('.hstgr.io');
+    const candidateHosts = isLinuxOrRemote
+      ? ['localhost', '127.0.0.1', cfg.host].filter((h, i, a) => Boolean(h) && a.indexOf(h) === i)
+      : [cfg.host, 'localhost', '127.0.0.1'].filter((h, i, a) => Boolean(h) && a.indexOf(h) === i);
+
+    const baseUser = cfg.user || 'u101820758_PO_1';
+    const baseDb = cfg.database || 'u101820758_PO_PROJECT_1';
+
     const candidateCreds = [
-      { user: cfg.user, db: cfg.database },
-      { user: cfg.user.replace(/_1$/i, ''), db: cfg.database.replace(/_1$/i, '') },
-      { user: `${cfg.user}_1`, db: `${cfg.database}_1` },
+      { user: baseUser, db: baseDb },
+      { user: baseDb, db: baseUser }, // User and DB swapped fallback
+      { user: 'u101820758_PO_1', db: 'u101820758_PO_PROJECT_1' },
+      { user: 'u101820758_PO_PROJECT_1', db: 'u101820758_PO_1' },
+      { user: 'u101820758_po_1', db: 'u101820758_po_project_1' },
+      { user: 'u101820758_po_project_1', db: 'u101820758_po_1' },
+      { user: 'u101820758_po_1', db: 'u101820758_po_1' },
+      { user: 'u101820758_po', db: 'u101820758_po' },
+      { user: 'u101820758_po', db: 'u101820758_po_1' },
+      { user: 'u101820758_po', db: 'u101820758_po_project_1' },
     ].filter((c, i, a) => a.findIndex((x) => x.user.toLowerCase() === c.user.toLowerCase() && x.db.toLowerCase() === c.db.toLowerCase()) === i);
 
     for (const host of candidateHosts) {

@@ -84,32 +84,32 @@ export default function Dealers() {
       {total > 20 && <div className="panel" style={{ textAlign: 'center' }}><button className="btn sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>← Prev</button><span style={{ margin: '0 12px', fontSize: 13 }}>Page {page} of {Math.ceil(total / 20)}</span><button className="btn sm" disabled={page * 20 >= total} onClick={() => setPage((p) => p + 1)}>Next →</button></div>}
       {modal && (
         <Modal title={modal === 'create' ? 'Add Dealer' : 'Edit Dealer'} onClose={() => setModal(null)}>
-            <div className="fields-2">
-              <label className="field"><span className="field-label">Code *</span><input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} disabled={modal === 'edit'} /></label>
-              <label className="field"><span className="field-label">Company Name *</span><input value={form.companyName} onChange={(e) => setForm({ ...form, companyName: e.target.value })} /></label>
-              <label className="field"><span className="field-label">Contact Person</span><input value={form.contactPerson} onChange={(e) => setForm({ ...form, contactPerson: e.target.value })} /></label>
-              <label className="field">
-                <span className="field-label">Phone</span>
-                <PhoneInput 
-                  value={form.phone} 
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })} 
-                />
-              </label>
-              <label className="field"><span className="field-label">Email</span><input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></label>
-              <label className="field"><span className="field-label">GSTIN</span><input value={form.gstin} onChange={(e) => setForm({ ...form, gstin: e.target.value })} /></label>
-            </div>
-            <label className="field"><span className="field-label">Address</span><input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
-            <div className="fields-2">
-              <label className="field"><span className="field-label">City</span><input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} /></label>
-              <label className="field"><span className="field-label">State</span><input value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} /></label>
-              <label className="field"><span className="field-label">PAN</span><input value={form.pan} onChange={(e) => setForm({ ...form, pan: e.target.value })} /></label>
-              <label className="field"><span className="field-label">Payment Terms</span>
-                <select value={form.paymentTerms} onChange={(e) => setForm({ ...form, paymentTerms: e.target.value })}>
-                  <option value="advance">Advance</option><option value="net_30">Net 30</option><option value="net_60">Net 60</option><option value="against_delivery">Against Delivery</option><option value="custom">Custom</option>
-                </select>
-              </label>
-            </div>
-            <label className="field"><span className="field-label">Notes</span><input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></label>
+          <div className="fields-2">
+            <label className="field"><span className="field-label">Code *</span><input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} disabled={modal === 'edit'} /></label>
+            <label className="field"><span className="field-label">Company Name *</span><input value={form.companyName} onChange={(e) => setForm({ ...form, companyName: e.target.value })} /></label>
+            <label className="field"><span className="field-label">Contact Person</span><input value={form.contactPerson} onChange={(e) => setForm({ ...form, contactPerson: e.target.value })} /></label>
+            <label className="field">
+              <span className="field-label">Phone</span>
+              <PhoneInput
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              />
+            </label>
+            <label className="field"><span className="field-label">Email</span><input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></label>
+            <label className="field"><span className="field-label">GSTIN</span><input value={form.gstin} onChange={(e) => setForm({ ...form, gstin: e.target.value })} /></label>
+          </div>
+          <label className="field"><span className="field-label">Address</span><input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
+          <div className="fields-2">
+            <label className="field"><span className="field-label">City</span><input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} /></label>
+            <label className="field"><span className="field-label">State</span><input value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} /></label>
+            <label className="field"><span className="field-label">PAN</span><input value={form.pan} onChange={(e) => setForm({ ...form, pan: e.target.value })} /></label>
+            <label className="field"><span className="field-label">Payment Terms</span>
+              <select value={form.paymentTerms} onChange={(e) => setForm({ ...form, paymentTerms: e.target.value })}>
+                <option value="advance">Advance</option><option value="net_30">Net 30</option><option value="net_60">Net 60</option><option value="against_delivery">Against Delivery</option><option value="custom">Custom</option>
+              </select>
+            </label>
+          </div>
+          <label className="field"><span className="field-label">Notes</span><input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></label>
           <div className="modal-actions">
             <button className="btn" onClick={() => setModal(null)}>Cancel</button>
             <button className="btn primary" onClick={save} disabled={saving || !form.code || !form.companyName}>{saving ? 'Saving…' : 'Save'}</button>
