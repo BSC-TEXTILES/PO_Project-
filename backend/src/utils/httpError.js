@@ -9,6 +9,7 @@ export class ApiError extends Error {
 export const badRequest = (message, details) => new ApiError(400, message, details);
 export const forbidden = (message, details) => new ApiError(403, message, details);
 export const notFoundError = (message = 'Not found') => new ApiError(404, message);
+export const notFound = notFoundError;
 export const tooManyRequests = (message = 'Too many requests') => new ApiError(429, message);
 
 // Wrap async route handlers so rejections reach the error middleware.
