@@ -137,9 +137,8 @@ CREATE TABLE IF NOT EXISTS `categories` (
   `code` VARCHAR(255) NOT NULL,
   `name` TEXT NOT NULL,
   `status` ENUM('active','inactive','archived') NOT NULL DEFAULT 'active',
-  `parent_category_id_uk` VARCHAR(36) GENERATED ALWAYS AS (COALESCE(`parent_category_id`, '')) VIRTUAL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_cat` (`section_id`, `parent_category_id_uk`, `code`)
+  UNIQUE KEY `uq_cat` (`section_id`, `parent_category_id`, `code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `chat_messages` (
@@ -240,9 +239,8 @@ CREATE TABLE IF NOT EXISTS `departments` (
   `status` ENUM('active','inactive','archived') NOT NULL DEFAULT 'active',
   `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   `updated_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-  `division_id_uk` VARCHAR(36) GENERATED ALWAYS AS (COALESCE(`division_id`, '')) VIRTUAL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_dept` (`division_id_uk`, `code`)
+  UNIQUE KEY `uq_dept` (`division_id`, `code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `divisions` (
@@ -379,9 +377,8 @@ CREATE TABLE IF NOT EXISTS `number_sequences` (
   `seq_year` INT NOT NULL,
   `prefix` TEXT NOT NULL,
   `current_value` BIGINT NOT NULL DEFAULT 0,
-  `division_id_uk` VARCHAR(36) GENERATED ALWAYS AS (COALESCE(`division_id`, '')) VIRTUAL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_seq` (`entity_type`, `division_id_uk`, `seq_year`)
+  UNIQUE KEY `uq_seq` (`entity_type`, `division_id`, `seq_year`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `organizations` (
@@ -455,11 +452,8 @@ CREATE TABLE IF NOT EXISTS `product_variants` (
   `size_id` CHAR(36) NULL,
   `colour_id` CHAR(36) NULL,
   `style` VARCHAR(255) NULL,
-  `size_id_uk` VARCHAR(36) GENERATED ALWAYS AS (COALESCE(`size_id`, '')) VIRTUAL,
-  `colour_id_uk` VARCHAR(36) GENERATED ALWAYS AS (COALESCE(`colour_id`, '')) VIRTUAL,
-  `style_uk` VARCHAR(255) GENERATED ALWAYS AS (COALESCE(`style`, '')) VIRTUAL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_variant` (`product_id`, `size_id_uk`, `colour_id_uk`, `style_uk`)
+  UNIQUE KEY `uq_variant` (`product_id`, `size_id`, `colour_id`, `style`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `products` (
@@ -491,8 +485,8 @@ CREATE TABLE IF NOT EXISTS `products` (
   `purchase_price` DECIMAL(12,2) NULL DEFAULT 0,
   `selling_price` DECIMAL(12,2) NULL DEFAULT 0,
   `internal_ref` TEXT NULL,
-  `profit_amount` DECIMAL(12,2) GENERATED ALWAYS AS (`selling_price` - `purchase_price`) PERSISTENT,
-  `profit_margin` DECIMAL(5,2) GENERATED ALWAYS AS (CASE WHEN `purchase_price` > 0 THEN ROUND(((`selling_price` - `purchase_price`) / `purchase_price`) * 100, 2) ELSE 0 END) PERSISTENT,
+  `profit_amount` DECIMAL(12,2) GENERATED ALWAYS AS (`selling_price` - `purchase_price`) VIRTUAL,
+  `profit_margin` DECIMAL(5,2) GENERATED ALWAYS AS (CASE WHEN `purchase_price` > 0 THEN ROUND(((`selling_price` - `purchase_price`) / `purchase_price`) * 100, 2) ELSE 0 END) VIRTUAL,
   `product_type_id` CHAR(36) NULL,
   `manual_size` TEXT NULL,
   PRIMARY KEY (`id`),
@@ -635,7 +629,7 @@ CREATE TABLE IF NOT EXISTS `receipt_items` (
   `received_qty` INT NOT NULL,
   `damaged_qty` INT NOT NULL DEFAULT 0,
   `rejected_qty` INT NOT NULL DEFAULT 0,
-  `accepted_qty` INT GENERATED ALWAYS AS (`received_qty` - `damaged_qty` - `rejected_qty`) PERSISTENT,
+  `accepted_qty` INT GENERATED ALWAYS AS (`received_qty` - `damaged_qty` - `rejected_qty`) VIRTUAL,
   `remarks` TEXT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_receipt_items_po_item` (`po_item_id`),

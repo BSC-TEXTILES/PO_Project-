@@ -337,6 +337,7 @@ async function main() {
   // Normalise the legacy demo email (older seeds stored a bare username here).
   await query(`UPDATE users SET email = 'sureshmen@bsc.local' WHERE username = 'sureshmen' AND email = 'sureshmen'`);
   const USERS = [
+    ['admin@bsctextiles.in', 'admin.bsc', 'BSC Textiles Super Admin', ['super_admin'], ['DVG', 'SMG', 'BLG'], [], 'Admin@123'],
     ['admin@bsc.local', 'admin', 'Rajeshwar V. Rao', ['super_admin'], ['DVG', 'SMG', 'BLG'], [], 'Admin@123'],
     ['dvg.admin@bsc.local', 'dvg.admin', 'Davanagere Domain Admin', ['domain_admin'], ['DVG'], [], 'Admin@123'],
     ['pm.dvg@bsc.local', 'pm.dvg', 'Davanagere Purchase Manager', ['purchase_manager'], ['DVG'], [], 'PM@12345'],
@@ -378,6 +379,18 @@ async function main() {
   console.log('\nSuper Admin can create further users, sections and rules from the UI (no code changes — §7).');
 }
 
-main()
-  .then(() => pool.end())
-  .catch((e) => { console.error('Seed failed:', e); pool.end(); process.exit(1); });
+export async function seedDatabase() {
+  await main();
+}
+
+import { fileURLToPath } from 'node:url';
+const isCli = process.argv[1] && (
+  process.argv[1] === fileURLToPath(import.meta.url) ||
+  process.argv[1].endsWith('seed.js')
+);
+
+if (isCli) {
+  main()
+    .then(() => pool.end())
+    .catch((e) => { console.error('Seed failed:', e); pool.end(); process.exit(1); });
+}

@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS `import_history` (
   KEY `idx_import_history_started` (`started_at`),
   KEY `idx_import_history_status` (`status`),
   CONSTRAINT `fk_import_history_uploaded_by` FOREIGN KEY (`uploaded_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `import_records` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS `import_records` (
   PRIMARY KEY (`id`),
   KEY `idx_import_records_import` (`import_id`, `row_index`),
   CONSTRAINT `fk_import_records_import` FOREIGN KEY (`import_id`) REFERENCES `import_history` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Product audit columns written by the import processor (were missing from the legacy schema).
 -- @column products.created_by

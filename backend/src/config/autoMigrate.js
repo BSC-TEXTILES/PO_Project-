@@ -149,6 +149,17 @@ export async function ensureMigrations() {
 
     const [appliedRows] = await conn.query('SELECT version, checksum FROM schema_migrations');
     const applied = new Map(appliedRows.map((r) => [r.version, r.checksum]));
+
+    // Safety check: if core tables (like users) do not exist, 001_schema.sql must run!
+    const [existingUsersTable] = await conn.query(
+      "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'users'",
+      [cfg.database]
+    );
+    if (!existingUsersTable || existingUsersTable.length === 0) {
+      applied.delete('001_schema.sql');
+      await conn.query("DELETE FROM schema_migrations WHERE version = '001_schema.sql'").catch(() => {});
+    }
+
     const files = fs.readdirSync(migrationsDir).filter((f) => /^\d{3}_.+\.sql$/.test(f)).sort();
 
     let ran = 0;
@@ -188,13 +199,23 @@ export async function ensureMigrations() {
     try {
       const [[{ n }]] = await conn.query('SELECT COUNT(*) AS n FROM users');
       if (Number(n) === 0) {
-        console.log('⏳ Empty database detected — running initial seed in background...');
+        console.log('⏳ Empty database detected — running initial seed...');
         const seedScript = findSeedScript();
         const backendDir = path.dirname(path.dirname(seedScript));
-        execFile(process.execPath, [seedScript], { cwd: backendDir }, (err, stdout, stderr) => {
-          if (err) console.error('✗ Auto-seed failed:', stderr || err.message);
-          else console.log('✓ Initial database seed completed.');
-        });
+        try {
+          const seedModule = await import(`file://${seedScript.replace(/\\/g, '/')}`);
+          if (typeof seedModule.seedDatabase === 'function') {
+            await seedModule.seedDatabase();
+            console.log('✓ Initial database seed completed in-process.');
+          } else {
+            throw new Error('seedDatabase export not found in seed module');
+          }
+        } catch (inProcessErr) {
+          execFile(process.execPath, [seedScript], { cwd: backendDir }, (err, stdout, stderr) => {
+            if (err) console.error('✗ Auto-seed failed:', stderr || err.message);
+            else console.log('✓ Initial database seed completed via execFile.');
+          });
+        }
       }
     } catch (e) {
       console.warn('⚠ Could not check users table for seeding:', e.message);

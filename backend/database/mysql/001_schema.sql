@@ -6,7 +6,7 @@
 -- Conventions
 --   * All timestamps are DATETIME(6) holding UTC. The application pool uses timezone 'Z'.
 --   * Primary keys are CHAR(36) UUIDs (preserved from the legacy database) except audit_logs (BIGINT).
---   * utf8mb4_0900_ai_ci collation: comparisons/unique keys are case-insensitive (same as legacy ILIKE / lower()).
+--   * utf8mb4_unicode_ci collation: comparisons/unique keys are case-insensitive (same as legacy ILIKE / lower()).
 --   * *_uk INVISIBLE columns emulate PostgreSQL "UNIQUE NULLS NOT DISTINCT".
 -- Idempotent: every statement uses IF NOT EXISTS, so re-running is safe.
 -- ============================================================================
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS `approval_actions` (
   `acted_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
   CONSTRAINT `chk_approval_actions_1` CHECK (((`action` IN ('submitted', 'approved', 'escalated')) OR (`comments` IS NOT NULL)))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `approval_instances` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS `approval_instances` (
   `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   `resolved_at` DATETIME(6) NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `approval_levels` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS `approval_levels` (
   `auto_escalate_after_hours` INT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `approval_levels_rule_id_level_no_key` (`rule_id`, `level_no`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `approval_rules` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS `approval_rules` (
   `is_active` TINYINT(1) NOT NULL DEFAULT 1,
   PRIMARY KEY (`id`),
   CONSTRAINT `chk_approval_rules_1` CHECK (((`max_value` IS NULL) OR (`max_value` >= `min_value`)))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `attachments` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS `attachments` (
   PRIMARY KEY (`id`),
   KEY `idx_attach_entity` (`entity_type`, `entity_id`),
   KEY `idx_attachments_entity` (`entity_type`, `entity_id`, `uploaded_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `audit_logs` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -102,13 +102,13 @@ CREATE TABLE IF NOT EXISTS `audit_logs` (
   KEY `idx_audit_entity` (`entity_type`, `entity_id`, `occurred_at`),
   KEY `idx_audit_occurred` (`occurred_at`),
   KEY `idx_audit_user` (`user_id`, `occurred_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `brand_collections` (
   `brand_id` CHAR(36) NOT NULL,
   `collection_id` CHAR(36) NOT NULL,
   PRIMARY KEY (`brand_id`, `collection_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `brands` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -128,7 +128,7 @@ CREATE TABLE IF NOT EXISTS `brands` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `brands_brand_number_key` (`brand_number`),
   UNIQUE KEY `brands_brand_serial_key` (`brand_serial`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `categories` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -137,10 +137,9 @@ CREATE TABLE IF NOT EXISTS `categories` (
   `code` VARCHAR(255) NOT NULL,
   `name` TEXT NOT NULL,
   `status` ENUM('active','inactive','archived') NOT NULL DEFAULT 'active',
-  `parent_category_id_uk` VARCHAR(36) GENERATED ALWAYS AS (IFNULL(`parent_category_id`, '')) VIRTUAL INVISIBLE,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_cat` (`section_id`, `parent_category_id_uk`, `code`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  UNIQUE KEY `uq_cat` (`section_id`, `parent_category_id`, `code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `chat_messages` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -151,7 +150,7 @@ CREATE TABLE IF NOT EXISTS `chat_messages` (
   PRIMARY KEY (`id`),
   KEY `idx_chat_div_time` (`division_id`, `created_at`),
   CONSTRAINT `chk_chat_messages_1` CHECK ((CHAR_LENGTH(TRIM(`body`)) > 0))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `collections` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -164,7 +163,7 @@ CREATE TABLE IF NOT EXISTS `collections` (
   `updated_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
   UNIQUE KEY `collections_code_key` (`code`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `colours` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -179,7 +178,7 @@ CREATE TABLE IF NOT EXISTS `colours` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `colours_code_key` (`code`),
   UNIQUE KEY `uq_colour_name_ci` (`name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `comments` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -191,7 +190,7 @@ CREATE TABLE IF NOT EXISTS `comments` (
   `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
   CONSTRAINT `chk_comments_1` CHECK ((`visibility` IN ('internal', 'approval')))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `company_settings` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -208,7 +207,7 @@ CREATE TABLE IF NOT EXISTS `company_settings` (
   `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   `updated_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `dealers` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -229,7 +228,7 @@ CREATE TABLE IF NOT EXISTS `dealers` (
   `updated_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
   UNIQUE KEY `dealers_code_key` (`code`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `departments` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -240,10 +239,9 @@ CREATE TABLE IF NOT EXISTS `departments` (
   `status` ENUM('active','inactive','archived') NOT NULL DEFAULT 'active',
   `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   `updated_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-  `division_id_uk` VARCHAR(36) GENERATED ALWAYS AS (IFNULL(`division_id`, '')) VIRTUAL INVISIBLE,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_dept` (`division_id_uk`, `code`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  UNIQUE KEY `uq_dept` (`division_id`, `code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `divisions` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -258,7 +256,7 @@ CREATE TABLE IF NOT EXISTS `divisions` (
   `updated_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
   UNIQUE KEY `divisions_code_key` (`code`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `export_jobs` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -272,7 +270,7 @@ CREATE TABLE IF NOT EXISTS `export_jobs` (
   `completed_at` DATETIME(6) NULL,
   PRIMARY KEY (`id`),
   CONSTRAINT `chk_export_jobs_1` CHECK ((`format` IN ('xlsx', 'csv', 'pdf')))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `file_attachments` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -285,7 +283,7 @@ CREATE TABLE IF NOT EXISTS `file_attachments` (
   `uploaded_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
   KEY `idx_file_attachments_uploaded` (`uploaded_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `import_jobs` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -300,7 +298,7 @@ CREATE TABLE IF NOT EXISTS `import_jobs` (
   `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   `completed_at` DATETIME(6) NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `inventory_transactions` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -315,7 +313,7 @@ CREATE TABLE IF NOT EXISTS `inventory_transactions` (
   `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
   KEY `idx_inv_lookup` (`division_id`, `product_id`, `size_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `locations` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -335,7 +333,7 @@ CREATE TABLE IF NOT EXISTS `locations` (
   `updated_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
   UNIQUE KEY `locations_code_key` (`code`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `manufacturers` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -355,7 +353,7 @@ CREATE TABLE IF NOT EXISTS `manufacturers` (
   `updated_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
   UNIQUE KEY `manufacturers_code_key` (`code`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `notifications` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -370,7 +368,7 @@ CREATE TABLE IF NOT EXISTS `notifications` (
   `sent_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   `read_at` DATETIME(6) NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `number_sequences` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -379,17 +377,16 @@ CREATE TABLE IF NOT EXISTS `number_sequences` (
   `seq_year` INT NOT NULL,
   `prefix` TEXT NOT NULL,
   `current_value` BIGINT NOT NULL DEFAULT 0,
-  `division_id_uk` VARCHAR(36) GENERATED ALWAYS AS (IFNULL(`division_id`, '')) VIRTUAL INVISIBLE,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_seq` (`entity_type`, `division_id_uk`, `seq_year`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  UNIQUE KEY `uq_seq` (`entity_type`, `division_id`, `seq_year`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `organizations` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
   `name` TEXT NOT NULL,
   `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `permissions` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -398,14 +395,14 @@ CREATE TABLE IF NOT EXISTS `permissions` (
   `description` TEXT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `permissions_code_key` (`code`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `product_colours` (
   `product_id` CHAR(36) NOT NULL,
   `colour_id` CHAR(36) NOT NULL,
   PRIMARY KEY (`product_id`, `colour_id`),
   KEY `idx_product_colours_colour` (`colour_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `product_images` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -420,20 +417,20 @@ CREATE TABLE IF NOT EXISTS `product_images` (
   `uploaded_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
   KEY `idx_product_images_product` (`product_id`, `is_primary`, `sort_order`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `product_manufacturers` (
   `product_id` CHAR(36) NOT NULL,
   `manufacturer_id` CHAR(36) NOT NULL,
   PRIMARY KEY (`product_id`, `manufacturer_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `product_sizes` (
   `product_id` CHAR(36) NOT NULL,
   `size_id` CHAR(36) NOT NULL,
   PRIMARY KEY (`product_id`, `size_id`),
   KEY `idx_product_sizes_size` (`size_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `product_types` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -447,7 +444,7 @@ CREATE TABLE IF NOT EXISTS `product_types` (
   `updated_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_product_type` (`section_id`, `category_id`, `subcategory_id`, `code`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `product_variants` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -455,12 +452,9 @@ CREATE TABLE IF NOT EXISTS `product_variants` (
   `size_id` CHAR(36) NULL,
   `colour_id` CHAR(36) NULL,
   `style` VARCHAR(255) NULL,
-  `size_id_uk` VARCHAR(36) GENERATED ALWAYS AS (IFNULL(`size_id`, '')) VIRTUAL INVISIBLE,
-  `colour_id_uk` VARCHAR(36) GENERATED ALWAYS AS (IFNULL(`colour_id`, '')) VIRTUAL INVISIBLE,
-  `style_uk` VARCHAR(255) GENERATED ALWAYS AS (IFNULL(`style`, '')) VIRTUAL INVISIBLE,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_variant` (`product_id`, `size_id_uk`, `colour_id_uk`, `style_uk`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  UNIQUE KEY `uq_variant` (`product_id`, `size_id`, `colour_id`, `style`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `products` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -491,8 +485,8 @@ CREATE TABLE IF NOT EXISTS `products` (
   `purchase_price` DECIMAL(12,2) NULL DEFAULT 0,
   `selling_price` DECIMAL(12,2) NULL DEFAULT 0,
   `internal_ref` TEXT NULL,
-  `profit_amount` DECIMAL(12,2) GENERATED ALWAYS AS (`selling_price` - `purchase_price`) STORED,
-  `profit_margin` DECIMAL(5,2) GENERATED ALWAYS AS (CASE WHEN `purchase_price` > 0 THEN ROUND(((`selling_price` - `purchase_price`) / `purchase_price`) * 100, 2) ELSE 0 END) STORED,
+  `profit_amount` DECIMAL(12,2) GENERATED ALWAYS AS (`selling_price` - `purchase_price`) VIRTUAL,
+  `profit_margin` DECIMAL(5,2) GENERATED ALWAYS AS (CASE WHEN `purchase_price` > 0 THEN ROUND(((`selling_price` - `purchase_price`) / `purchase_price`) * 100, 2) ELSE 0 END) VIRTUAL,
   `product_type_id` CHAR(36) NULL,
   `manual_size` TEXT NULL,
   PRIMARY KEY (`id`),
@@ -504,7 +498,7 @@ CREATE TABLE IF NOT EXISTS `products` (
   KEY `idx_products_material` (`material`),
   KEY `idx_products_status` (`status`),
   UNIQUE KEY `uq_product_sku` (`sku`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `purchase_order_charges` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -515,7 +509,7 @@ CREATE TABLE IF NOT EXISTS `purchase_order_charges` (
   `is_supplier_billed` TINYINT(1) NOT NULL DEFAULT 1,
   PRIMARY KEY (`id`),
   CONSTRAINT `chk_purchase_order_charges_1` CHECK ((`amount` >= 0))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `purchase_order_discounts` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -527,7 +521,7 @@ CREATE TABLE IF NOT EXISTS `purchase_order_discounts` (
   PRIMARY KEY (`id`),
   CONSTRAINT `chk_purchase_order_discounts_1` CHECK ((`discount_amount` >= 0)),
   CONSTRAINT `chk_purchase_order_discounts_2` CHECK ((`discount_value` >= 0))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `purchase_order_items` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -557,7 +551,7 @@ CREATE TABLE IF NOT EXISTS `purchase_order_items` (
   CONSTRAINT `chk_purchase_order_items_3` CHECK ((`margin_percent` >= 0)),
   CONSTRAINT `chk_purchase_order_items_4` CHECK ((`purchase_price` >= 0)),
   CONSTRAINT `chk_purchase_order_items_5` CHECK ((`total_quantity` > 0))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `purchase_order_quantities` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -568,7 +562,7 @@ CREATE TABLE IF NOT EXISTS `purchase_order_quantities` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `purchase_order_quantities_po_item_id_size_id_key` (`po_item_id`, `size_id`),
   CONSTRAINT `chk_purchase_order_quantities_1` CHECK ((`quantity` >= 0))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `purchase_order_taxes` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -579,7 +573,7 @@ CREATE TABLE IF NOT EXISTS `purchase_order_taxes` (
   `taxable_base` DECIMAL(14,2) NOT NULL,
   `tax_amount` DECIMAL(14,2) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `purchase_orders` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -625,7 +619,7 @@ CREATE TABLE IF NOT EXISTS `purchase_orders` (
   CONSTRAINT `chk_purchase_orders_3` CHECK ((`order_discount_amount` >= 0)),
   CONSTRAINT `chk_purchase_orders_4` CHECK ((`subtotal` >= 0)),
   CONSTRAINT `chk_purchase_orders_5` CHECK ((`tax_amount` >= 0))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `receipt_items` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -635,7 +629,7 @@ CREATE TABLE IF NOT EXISTS `receipt_items` (
   `received_qty` INT NOT NULL,
   `damaged_qty` INT NOT NULL DEFAULT 0,
   `rejected_qty` INT NOT NULL DEFAULT 0,
-  `accepted_qty` INT GENERATED ALWAYS AS (`received_qty` - `damaged_qty` - `rejected_qty`) STORED,
+  `accepted_qty` INT GENERATED ALWAYS AS (`received_qty` - `damaged_qty` - `rejected_qty`) VIRTUAL,
   `remarks` TEXT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_receipt_items_po_item` (`po_item_id`),
@@ -643,7 +637,7 @@ CREATE TABLE IF NOT EXISTS `receipt_items` (
   CONSTRAINT `chk_receipt_items_2` CHECK ((`damaged_qty` >= 0)),
   CONSTRAINT `chk_receipt_items_3` CHECK ((`received_qty` >= 0)),
   CONSTRAINT `chk_receipt_items_4` CHECK ((`rejected_qty` >= 0))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `receipts` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -661,13 +655,13 @@ CREATE TABLE IF NOT EXISTS `receipts` (
   `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
   UNIQUE KEY `receipts_receipt_number_key` (`receipt_number`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `role_permissions` (
   `role_id` CHAR(36) NOT NULL,
   `permission_id` CHAR(36) NOT NULL,
   PRIMARY KEY (`role_id`, `permission_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `roles` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -676,7 +670,7 @@ CREATE TABLE IF NOT EXISTS `roles` (
   `description` TEXT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `roles_code_key` (`code`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `section_attributes` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -689,7 +683,7 @@ CREATE TABLE IF NOT EXISTS `section_attributes` (
   `display_order` INT NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
   UNIQUE KEY `section_attributes_section_id_attribute_key_key` (`section_id`, `attribute_key`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `sections` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -708,7 +702,7 @@ CREATE TABLE IF NOT EXISTS `sections` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_section` (`department_id`, `code`),
   KEY `idx_sections_status` (`department_id`, `status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `settings` (
   `key` VARCHAR(255) NOT NULL,
@@ -717,7 +711,7 @@ CREATE TABLE IF NOT EXISTS `settings` (
   `updated_by` CHAR(36) NULL,
   `updated_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`key`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `size_methods` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -726,7 +720,7 @@ CREATE TABLE IF NOT EXISTS `size_methods` (
   `is_custom` TINYINT(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
   UNIQUE KEY `size_methods_code_key` (`code`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `sizes` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -736,19 +730,19 @@ CREATE TABLE IF NOT EXISTS `sizes` (
   `display_order` INT NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
   UNIQUE KEY `sizes_size_method_id_label_key` (`size_method_id`, `label`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `supplier_brands` (
   `supplier_id` CHAR(36) NOT NULL,
   `brand_id` CHAR(36) NOT NULL,
   PRIMARY KEY (`supplier_id`, `brand_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `supplier_divisions` (
   `supplier_id` CHAR(36) NOT NULL,
   `division_id` CHAR(36) NOT NULL,
   PRIMARY KEY (`supplier_id`, `division_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `suppliers` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -770,31 +764,31 @@ CREATE TABLE IF NOT EXISTS `suppliers` (
   `updated_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
   UNIQUE KEY `suppliers_code_key` (`code`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `user_collections` (
   `user_id` CHAR(36) NOT NULL,
   `collection_id` CHAR(36) NOT NULL,
   PRIMARY KEY (`user_id`, `collection_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `user_divisions` (
   `user_id` CHAR(36) NOT NULL,
   `division_id` CHAR(36) NOT NULL,
   PRIMARY KEY (`user_id`, `division_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `user_roles` (
   `user_id` CHAR(36) NOT NULL,
   `role_id` CHAR(36) NOT NULL,
   PRIMARY KEY (`user_id`, `role_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `user_sections` (
   `user_id` CHAR(36) NOT NULL,
   `section_id` CHAR(36) NOT NULL,
   PRIMARY KEY (`user_id`, `section_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `user_sessions` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -822,7 +816,7 @@ CREATE TABLE IF NOT EXISTS `user_sessions` (
   KEY `idx_user_sessions_seen` (`last_seen_at`),
   KEY `idx_user_sessions_token` (`token_hash`),
   KEY `idx_user_sessions_user` (`user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `users` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -851,7 +845,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   UNIQUE KEY `users_email_key` (`email`),
   UNIQUE KEY `users_username_key` (`username`),
   KEY `idx_users_password_changed_at` (`password_changed_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `user_permissions` (
   `user_id` CHAR(36) NOT NULL,
@@ -861,7 +855,7 @@ CREATE TABLE IF NOT EXISTS `user_permissions` (
   `updated_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`user_id`, `permission_id`),
   KEY `idx_user_permissions_perm` (`permission_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `videos` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
@@ -882,7 +876,7 @@ CREATE TABLE IF NOT EXISTS `videos` (
   PRIMARY KEY (`id`),
   KEY `idx_videos_category` (`category`, `status`),
   KEY `idx_videos_created` (`created_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
 -- Foreign keys. Each is preceded by an "@fk table.name" marker: the migration runner
