@@ -96,7 +96,7 @@ r.get('/dashboard', authenticate, ah(async (req, res) => {
       SUM(CASE WHEN current_status = 'dispatched' THEN 1 ELSE 0 END) AS dispatched,
       SUM(CASE WHEN current_status IN ('in_transit', 'at_hub', 'out_for_delivery') THEN 1 ELSE 0 END) AS in_transit,
       SUM(CASE WHEN current_status = 'delivered' OR store_received_status = 'received_verified' THEN 1 ELSE 0 END) AS received,
-      SUM(CASE WHEN current_status = 'delayed' THEN 1 ELSE 0 END) AS delayed,
+      SUM(CASE WHEN current_status = 'delayed' THEN 1 ELSE 0 END) AS delayed_count,
       SUM(CASE WHEN current_status = 'exception' THEN 1 ELSE 0 END) AS exceptions
     FROM lr_tracking
     GROUP BY destination_store
@@ -120,7 +120,7 @@ r.get('/dashboard', authenticate, ah(async (req, res) => {
         dispatched: Number(r.dispatched || 0),
         in_transit: Number(r.in_transit || 0),
         received: Number(r.received || 0),
-        delayed: Number(r.delayed || 0),
+        delayed: Number(r.delayed_count ?? r.delayed ?? 0),
         exceptions: Number(r.exceptions || 0),
       };
     }
