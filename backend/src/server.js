@@ -30,6 +30,18 @@ probeDatabase();
 const server = app.listen(port, () => {
   console.log(`POMS API listening on http://localhost:${port}`);
   console.log(`  frontend dev proxy target: http://localhost:${port} (must match frontend/vite.config.js)`);
+
+  // Keep application warm on LiteSpeed / lsnode (prevent 300-second idle sleep)
+  const PING_INTERVAL = 240_000; // 4 minutes (< 300s timeout)
+  setInterval(async () => {
+    try {
+      const urls = [`http://127.0.0.1:${port}/api/health`];
+      if (process.env.APP_URL) urls.push(`${process.env.APP_URL}/api/health`);
+      for (const u of urls) {
+        await fetch(u, { headers: { 'User-Agent': 'POMS-KeepAlive' } }).catch(() => {});
+      }
+    } catch (_) {}
+  }, PING_INTERVAL).unref();
 });
 
 // Keep chat/notify WebSockets alive; log upstream socket errors instead of crashing

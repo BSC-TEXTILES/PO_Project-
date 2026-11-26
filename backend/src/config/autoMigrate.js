@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import mysql from 'mysql2/promise';
+import bcrypt from 'bcryptjs';
 import { resolveDbConfig } from './dbConfig.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -336,9 +337,41 @@ export async function ensureMigrations() {
     } catch (e) {
       console.warn('⚠ Could not check users table for seeding:', e.message);
     }
+
+    // Ensure the default super admin always exists and can log in
+    await ensureDefaultAdmin(conn);
   } catch (e) {
     console.warn(`⚠ Auto-migration error: ${e.message}`);
   } finally {
     if (conn) await conn.end().catch(() => {});
+  }
+}
+
+async function ensureDefaultAdmin(conn) {
+  try {
+    const [existing] = await conn.query(
+      "SELECT id FROM users WHERE email = 'admin@bsctextiles.in' OR email = 'admin@bsc.local' LIMIT 1"
+    );
+    if (!existing || existing.length === 0) {
+      const adminId = crypto.randomUUID ? crypto.randomUUID() : 'a0000000-0000-4000-8000-000000000001';
+      const hash = await bcrypt.hash('Admin@123', 10);
+      await conn.query(
+        `INSERT INTO users (id, email, username, password_hash, full_name, status)
+         VALUES (?, 'admin@bsctextiles.in', 'admin.bsc', ?, 'BSC Textiles Super Admin', 'active')
+         ON DUPLICATE KEY UPDATE status = 'active'`,
+        [adminId, hash]
+      );
+      // Ensure super_admin role assignment
+      const [roleRows] = await conn.query("SELECT id FROM roles WHERE code = 'super_admin'");
+      if (roleRows && roleRows.length > 0) {
+        await conn.query(
+          "INSERT IGNORE INTO user_roles (user_id, role_id) VALUES (?, ?)",
+          [adminId, roleRows[0].id]
+        );
+      }
+      console.log('✓ Default super admin guaranteed: admin@bsctextiles.in (Admin@123)');
+    }
+  } catch (err) {
+    console.warn(`⚠ Could not verify default admin: ${err.message}`);
   }
 }
