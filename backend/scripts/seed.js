@@ -239,6 +239,7 @@ async function main() {
     ['KIDS-INFANT', 'Kids Infant Wear', 'KIDS', 'age_group', 22],
     ['KIDS-TOYS', 'Toys & Games', 'KIDS', 'age_group', 23],
     ['HOME-FURN', 'Home Furnishing (Textiles & Decor)', 'HOME', 'custom', 30],
+    ['FURNITURE', 'Furniture (Living, Bedroom & Dining)', 'HOME', 'custom', 31],
   ];
   for (const [code, name, deptCode, methodCode, order] of SECTIONS) {
     await query(

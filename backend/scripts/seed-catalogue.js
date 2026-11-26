@@ -195,9 +195,11 @@ export async function seedCollections() {
 }
 
 export async function seedChat() {
-  const empty = (await query(`SELECT count(*) AS c FROM chat_messages`)).rows[0].c === 0;
+  const empty = Number((await query(`SELECT count(*) AS c FROM chat_messages`)).rows[0].c) === 0;
   if (!empty) return;
-  const admin = (await query(`SELECT id FROM users WHERE email = 'admin@bsc.local'`)).rows[0];
+  const admin = (await query(
+    `SELECT id FROM users WHERE email IN ('admin@bsc.local', 'admin@bsctextiles.in') ORDER BY email = 'admin@bsc.local' DESC LIMIT 1`)).rows[0];
+  if (!admin) { console.log('  (skipped team chat seed: no admin user)'); return; }
   const divisions = (await query(`SELECT id, code FROM divisions ORDER BY code`)).rows;
   const welcome = [
     ['Welcome to BSC POMS team chat 🎉 — raise PO queries, share dealer updates and approval notes here. Messages are division-scoped.', null],
