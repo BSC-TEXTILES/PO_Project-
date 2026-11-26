@@ -52,7 +52,7 @@ function createPool(host = cfg.host, user = cfg.user, database = cfg.database) {
     password: cfg.password,
     database,
     ssl: cfg.ssl,
-    charset: 'utf8mb4_0900_ai_ci',
+    charset: 'utf8mb4_unicode_ci',
     timezone: 'Z',
     dateStrings: ['DATE'],
     decimalNumbers: true,

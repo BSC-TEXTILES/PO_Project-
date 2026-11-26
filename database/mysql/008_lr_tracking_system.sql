@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS `transporter_integrations` (
   `updated_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_transporter_code` (`code`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 2. Shipment Store Locations (Belagavi, Davanagere, Shivamogga)
 CREATE TABLE IF NOT EXISTS `shipment_locations` (
@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS `shipment_locations` (
   `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_shipment_loc_code` (`code`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 3. Uploaded LR Documents (Camera & Gallery Uploads)
 CREATE TABLE IF NOT EXISTS `lr_documents` (
@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS `lr_documents` (
   PRIMARY KEY (`id`),
   KEY `idx_lr_docs_uploaded_by` (`uploaded_by`),
   KEY `idx_lr_docs_created` (`created_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 4. Extracted LR Details (OCR & Document Intelligence)
 CREATE TABLE IF NOT EXISTS `lr_extracted_details` (
@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS `lr_extracted_details` (
   PRIMARY KEY (`id`),
   KEY `idx_lr_extracted_doc` (`lr_document_id`),
   KEY `idx_lr_extracted_num` (`lr_number`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 5. Primary LR Tracking & Shipment Registry
 CREATE TABLE IF NOT EXISTS `lr_tracking` (
@@ -129,7 +129,7 @@ CREATE TABLE IF NOT EXISTS `lr_tracking` (
   KEY `idx_lr_po_id` (`po_id`),
   KEY `idx_lr_booking_date` (`booking_date`),
   KEY `idx_lr_created_at` (`created_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 6. Detailed Shipment Tracking Milestones & Events Timeline
 CREATE TABLE IF NOT EXISTS `lr_tracking_events` (
@@ -144,7 +144,7 @@ CREATE TABLE IF NOT EXISTS `lr_tracking_events` (
   `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
   KEY `idx_lr_events_tracking_id` (`lr_tracking_id`, `event_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 7. Delivery Proofs & Photos (POD)
 CREATE TABLE IF NOT EXISTS `shipment_delivery_proofs` (
@@ -160,7 +160,7 @@ CREATE TABLE IF NOT EXISTS `shipment_delivery_proofs` (
   `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
   KEY `idx_delivery_proofs_lr` (`lr_tracking_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 8. Store Goods Receiving & Verification
 CREATE TABLE IF NOT EXISTS `shipment_receipts` (
@@ -180,7 +180,7 @@ CREATE TABLE IF NOT EXISTS `shipment_receipts` (
   `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
   KEY `idx_receipts_lr` (`lr_tracking_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 9. Transporter Background Sync Logs
 CREATE TABLE IF NOT EXISTS `shipment_sync_logs` (
@@ -196,7 +196,7 @@ CREATE TABLE IF NOT EXISTS `shipment_sync_logs` (
   `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
   KEY `idx_sync_logs_lr` (`lr_tracking_id`, `created_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 10. LR Audit Trail
 CREATE TABLE IF NOT EXISTS `lr_audit_logs` (
@@ -210,7 +210,7 @@ CREATE TABLE IF NOT EXISTS `lr_audit_logs` (
   PRIMARY KEY (`id`),
   KEY `idx_lr_audit_lr` (`lr_tracking_id`),
   KEY `idx_lr_audit_created` (`created_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Add tracking columns to purchase_orders if they don't exist
 -- @column purchase_orders.lr_number

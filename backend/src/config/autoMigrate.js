@@ -145,7 +145,7 @@ export async function ensureMigrations() {
         checksum CHAR(64) NOT NULL,
         applied_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
         duration_ms INT NOT NULL DEFAULT 0
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`);
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
 
     const [appliedRows] = await conn.query('SELECT version, checksum FROM schema_migrations');
     const applied = new Map(appliedRows.map((r) => [r.version, r.checksum]));
