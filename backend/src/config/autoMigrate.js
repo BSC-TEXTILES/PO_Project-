@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFile } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import mysql from 'mysql2/promise';
 import { resolveDbConfig } from './dbConfig.js';
 
@@ -67,6 +67,86 @@ function splitStatements(sqlText) {
   if (cur.trim()) out.push({ sql: cur.trim(), markers });
   return out;
 }
+
+const TARGET_CHARSET = 'utf8mb4';
+const TARGET_COLLATION = 'utf8mb4_unicode_ci';
+
+/** Parses every `CREATE TABLE IF NOT EXISTS` in the migration files → { table: [[col, definition], ...] }. */
+function parseTableDefinitions(migrationsDir, files) {
+  const tables = new Map();
+  for (const file of files) {
+    const text = fs.readFileSync(path.join(migrationsDir, file), 'utf8').replace(/\r\n/g, '\n');
+    for (const m of text.matchAll(/CREATE TABLE IF NOT EXISTS `(\w+)` \(\n([\s\S]*?)\n\)\s*ENGINE=/g)) {
+      const cols = [];
+      for (const line of m[2].split('\n')) {
+        const c = line.match(/^\s*`(\w+)`\s+(.+?),?\s*$/);
+        if (c) cols.push([c[1], `\`${c[1]}\` ${c[2]}`]);
+      }
+      if (!tables.has(m[1])) tables.set(m[1], cols);
+    }
+  }
+  return tables;
+}
+
+/**
+ * Tables left behind by older deploys may use a different collation (the schema
+ * once used utf8mb4_0900_ai_ci, which MariaDB 11.4+ maps to a uca1400 collation).
+ * A FK between columns with different collations fails with errno 150, so every
+ * POMS table is converted to the one collation the schema uses.
+ */
+async function normalizeCollations(conn, db, ownTables) {
+  const [rows] = await conn.query(
+    `SELECT DISTINCT t.TABLE_NAME AS name
+       FROM information_schema.TABLES t
+       LEFT JOIN information_schema.COLUMNS c
+         ON c.TABLE_SCHEMA = t.TABLE_SCHEMA AND c.TABLE_NAME = t.TABLE_NAME
+        AND c.COLLATION_NAME IS NOT NULL AND c.COLLATION_NAME <> ?
+      WHERE t.TABLE_SCHEMA = ? AND t.TABLE_TYPE = 'BASE TABLE'
+        AND (t.TABLE_COLLATION <> ? OR c.COLUMN_NAME IS NOT NULL)`,
+    [TARGET_COLLATION, db, TARGET_COLLATION]);
+  const todo = rows.map((r) => r.name).filter((n) => ownTables.has(n));
+  if (!todo.length) return;
+  await conn.query('SET SESSION FOREIGN_KEY_CHECKS = 0');
+  try {
+    for (const t of todo) {
+      try {
+        await conn.query(`ALTER TABLE \`${t}\` CONVERT TO CHARACTER SET ${TARGET_CHARSET} COLLATE ${TARGET_COLLATION}`);
+        console.log(`✓ Normalised collation of ${t} → ${TARGET_COLLATION}`);
+      } catch (e) {
+        console.warn(`⚠ Could not normalise collation of ${t}: ${e.message}`);
+      }
+    }
+  } finally {
+    await conn.query('SET SESSION FOREIGN_KEY_CHECKS = 1');
+  }
+}
+
+/** Adds columns the schema defines but an older, already-existing table lacks. */
+async function addMissingColumns(conn, db, tableDefs) {
+  const [rows] = await conn.query(
+    'SELECT TABLE_NAME AS t, COLUMN_NAME AS c FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ?', [db]);
+  const existing = new Map();
+  for (const r of rows) {
+    if (!existing.has(r.t)) existing.set(r.t, new Set());
+    existing.get(r.t).add(r.c.toLowerCase());
+  }
+  for (const [table, cols] of tableDefs) {
+    const have = existing.get(table);
+    if (!have) continue; // table not created yet — the migration's CREATE TABLE builds it whole
+    for (const [col, def] of cols) {
+      if (have.has(col.toLowerCase())) continue;
+      try {
+        await conn.query(`ALTER TABLE \`${table}\` ADD COLUMN ${def}`);
+        have.add(col.toLowerCase());
+        console.log(`✓ Added missing column ${table}.${col}`);
+      } catch (e) {
+        console.warn(`⚠ Could not add column ${table}.${col}: ${e.message}`);
+      }
+    }
+  }
+}
+
+const isForeignKeyStatement = (sql) => /ADD\s+CONSTRAINT\s+`?\w+`?\s+FOREIGN\s+KEY/i.test(sql);
 
 async function markerExists(conn, db, marker) {
   if (marker.kind === 'fk') {
@@ -162,7 +242,14 @@ export async function ensureMigrations() {
 
     const files = fs.readdirSync(migrationsDir).filter((f) => /^\d{3}_.+\.sql$/.test(f)).sort();
 
+    // Repair drift left by earlier deploys before applying anything.
+    const tableDefs = parseTableDefinitions(migrationsDir, files);
+    const ownTables = new Set([...tableDefs.keys(), 'schema_migrations']);
+    await normalizeCollations(conn, cfg.database, ownTables);
+    await addMissingColumns(conn, cfg.database, tableDefs);
+
     let ran = 0;
+    let failed = 0;
     for (const file of files) {
       const text = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
       const checksum = crypto.createHash('sha256').update(text.replace(/\r\n/g, '\n')).digest('hex');
@@ -187,6 +274,13 @@ export async function ensureMigrations() {
               console.warn(`  ↳ skipped existing constraint/table (${stErr.code || 'EXISTS'})`);
               continue;
             }
+            // A foreign key is referential hardening only; one that cannot be built
+            // (legacy column type, orphan rows) must not block the rest of the schema.
+            if (isForeignKeyStatement(st.sql)) {
+              const name = st.sql.match(/ADD\s+CONSTRAINT\s+`?(\w+)`?/i)?.[1];
+              console.warn(`⚠ ${file}: foreign key ${name} skipped — ${stErr.message}`);
+              continue;
+            }
             throw stErr;
           }
         }
@@ -200,11 +294,14 @@ export async function ensureMigrations() {
           console.warn(`⚠ Optional migration ${file} skipped: ${e.message}`);
           continue;
         }
+        // Keep going: later migrations are marker-guarded and independent, and
+        // stopping here is what left roles.status (007) missing in production.
+        failed++;
         console.error(`✗ Auto-migration ${file} failed: ${e.message}`);
-        break;
       }
     }
     if (ran > 0) console.log(`✓ Database schema updated (${ran} migration(s) applied)`);
+    if (failed > 0) console.error(`✗ ${failed} migration(s) failed — they will be retried on next start`);
 
     // Auto-seed only if users table is completely empty (e.g. fresh Hostinger DB)
     try {
@@ -213,18 +310,26 @@ export async function ensureMigrations() {
         console.log('⏳ Empty database detected — running initial seed...');
         const seedScript = findSeedScript();
         const backendDir = path.dirname(path.dirname(seedScript));
+        let seedModule = null;
         try {
-          const seedModule = await import(`file://${seedScript.replace(/\\/g, '/')}`);
-          if (typeof seedModule.seedDatabase === 'function') {
+          seedModule = await import(pathToFileURL(seedScript).href);
+        } catch (importErr) {
+          console.warn(`⚠ Could not load seed module in-process (${importErr.message}) — running it as a child process`);
+        }
+        if (seedModule && typeof seedModule.seedDatabase === 'function') {
+          // Run in-process only. The old code then re-ran the script as a child
+          // process on any error, which collided with the half-seeded data and
+          // hid the real error behind "Command failed".
+          try {
             await seedModule.seedDatabase();
             console.log('✓ Initial database seed completed in-process.');
-          } else {
-            throw new Error('seedDatabase export not found in seed module');
+          } catch (seedErr) {
+            console.error('✗ Auto-seed failed:', seedErr?.stack || seedErr);
           }
-        } catch (inProcessErr) {
-          execFile(process.execPath, [seedScript], { cwd: backendDir }, (err, stdout, stderr) => {
+        } else {
+          execFile(process.execPath, [seedScript], { cwd: backendDir }, (err, _stdout, stderr) => {
             if (err) console.error('✗ Auto-seed failed:', stderr || err.message);
-            else console.log('✓ Initial database seed completed via execFile.');
+            else console.log('✓ Initial database seed completed via child process.');
           });
         }
       }
