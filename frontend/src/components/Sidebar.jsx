@@ -39,6 +39,15 @@ const SECTIONS = [
     ],
   },
   {
+    label: 'LR Tracking',
+    items: [
+      { to: '/lr-tracking', label: 'LR Tracking', icon: 'truck', alwaysVisible: true, end: true },
+      { to: '/lr-tracking/upload', label: 'Upload LR Document', icon: 'camera', alwaysVisible: true },
+      { to: '/lr-tracking/track', label: 'Track Order', icon: 'truck', alwaysVisible: true },
+      { to: '/lr-tracking/receiving', label: 'Goods Received', icon: 'package', alwaysVisible: true },
+    ],
+  },
+  {
     label: 'Operations',
     items: [
       { to: '/chat', label: 'Team Chat', icon: 'chat', permission: 'chat.view' },
@@ -87,6 +96,7 @@ const DEPARTMENT_GROUPS = [
 ];
 
 function canSee(item, user) {
+  if (item.alwaysVisible) return true;
   if (item.permission && !user.isSuperAdmin && !user.permissions?.includes(item.permission)) return false;
   if (item.superAdminOnly && !user.isSuperAdmin) return false;
   // Role-level trimming: Purchase Executives (e.g. Sachin — DVG) get a focused

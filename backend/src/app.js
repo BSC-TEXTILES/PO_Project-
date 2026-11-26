@@ -28,6 +28,7 @@ import collectionRoutes from './routes/collections.js';
 import fileRoutes from './routes/files.js';
 import importRoutes from './routes/import.js';
 import trackingRoutes from './routes/tracking.js';
+import lrRoutes from './routes/lrTracking.js';
 
 selfTest(); // RB-017 guard: engine must reproduce FRS §13.3 exactly at boot
 
@@ -150,6 +151,7 @@ app.use('/api', collectionRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/tracking', trackingRoutes);
 app.use('/api/import', importRoutes);
+app.use('/api/lr', lrRoutes);
 
 // ─── Serve the built React client (single-origin full-stack site) ──────────
 import fs from 'node:fs';

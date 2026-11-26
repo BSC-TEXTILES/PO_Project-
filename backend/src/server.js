@@ -4,6 +4,7 @@ import app from './app.js';
 import { pool, ping } from './config/db.js';
 import { ensureMigrations } from './config/autoMigrate.js';
 import { attachChatWs } from './ws/chat.js';
+import { startLrSyncWorker } from './workers/lrSyncWorker.js';
 
 const port = process.env.PORT || 4040;
 
@@ -13,6 +14,7 @@ async function probeDatabase() {
     const info = await ping();
     console.log(`✓ MySQL ${info.version} connected (database: ${info.database}) in ${info.ms} ms — database ready`);
     await ensureMigrations();
+    startLrSyncWorker(20);
   } catch (e) {
     const reason = e.code === 'ECONNREFUSED'
       ? 'connection refused — MySQL service is not running'

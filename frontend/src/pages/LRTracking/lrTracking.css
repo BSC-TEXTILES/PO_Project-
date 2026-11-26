@@ -1,0 +1,485 @@
+/* ==========================================================================
+   LR Tracking & Shipment Management Styles (Blue & White Enterprise UI)
+   ========================================================================== */
+
+.lr-container {
+  padding: 24px 32px 48px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* Header & Tabs */
+.lr-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.lr-title-group h1 {
+  font-size: 26px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 6px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.lr-title-group p {
+  color: #64748b;
+  margin: 0;
+  font-size: 14px;
+}
+
+.lr-nav-tabs {
+  display: flex;
+  gap: 8px;
+  background: #f1f5f9;
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+.lr-nav-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #475569;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+}
+
+.lr-nav-tab:hover {
+  color: #1e40af;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.lr-nav-tab.active {
+  background: #ffffff;
+  color: #1d4ed8;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* KPI Summary Cards Grid */
+.lr-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.lr-kpi-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 18px 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  transition: transform 0.2s, box-shadow 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.lr-kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
+}
+
+.lr-kpi-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  margin-bottom: 8px;
+}
+
+.lr-kpi-val {
+  font-size: 28px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.1;
+  margin-bottom: 4px;
+}
+
+.lr-kpi-sub {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.lr-kpi-card.blue { border-left: 4px solid #3b82f6; }
+.lr-kpi-card.cyan { border-left: 4px solid #06b6d4; }
+.lr-kpi-card.amber { border-left: 4px solid #f59e0b; }
+.lr-kpi-card.green { border-left: 4px solid #10b981; }
+.lr-kpi-card.red { border-left: 4px solid #ef4444; }
+.lr-kpi-card.purple { border-left: 4px solid #8b5cf6; }
+
+/* Location Breakdown Cards */
+.lr-location-section {
+  margin-bottom: 32px;
+}
+
+.lr-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.lr-section-header h2 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lr-location-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+@media (max-width: 1024px) {
+  .lr-location-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.lr-loc-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 22px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+}
+
+.lr-loc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.lr-loc-code-pill {
+  font-size: 12px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  letter-spacing: 0.05em;
+}
+
+.lr-loc-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.lr-loc-stats-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.lr-loc-stat-box {
+  background: #f8fafc;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid #f1f5f9;
+}
+
+.lr-loc-stat-box .num {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.lr-loc-stat-box .txt {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+}
+
+/* Upload Interface Styles */
+.lr-upload-box {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 32px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+  margin-bottom: 28px;
+}
+
+.lr-drop-zone {
+  border: 2px dashed #93c5fd;
+  background: #f8fafc;
+  border-radius: 14px;
+  padding: 40px 24px;
+  text-align: center;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  margin-bottom: 24px;
+}
+
+.lr-drop-zone:hover {
+  background: #eff6ff;
+  border-color: #3b82f6;
+}
+
+.lr-upload-buttons-row {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+.lr-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.lr-upload-btn.camera {
+  background: #1d4ed8;
+  color: #ffffff;
+}
+
+.lr-upload-btn.camera:hover {
+  background: #1e40af;
+}
+
+.lr-upload-btn.gallery {
+  background: #f1f5f9;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+}
+
+.lr-upload-btn.gallery:hover {
+  background: #e2e8f0;
+}
+
+/* Verification Form Grid */
+.lr-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.lr-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lr-field-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #334155;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.lr-field-input {
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  font-size: 13.5px;
+  color: #0f172a;
+  background: #ffffff;
+  transition: border-color 0.2s;
+  width: 100%;
+}
+
+.lr-field-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.lr-conf-pill {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+.lr-conf-high { background: #dcfce7; color: #166534; }
+.lr-conf-med { background: #fef3c7; color: #92400e; }
+.lr-conf-low { background: #fee2e2; color: #991b1b; }
+
+/* Status Badges */
+.lr-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: capitalize;
+  letter-spacing: 0.02em;
+}
+
+.lr-status-booked { background: #e0e7ff; color: #3730a3; }
+.lr-status-dispatched { background: #f3e8ff; color: #6b21a8; }
+.lr-status-in_transit { background: #e0f2fe; color: #0369a1; }
+.lr-status-at_hub { background: #ede9fe; color: #5b21b6; }
+.lr-status-out_for_delivery { background: #fef3c7; color: #92400e; }
+.lr-status-delivered { background: #dcfce7; color: #166534; }
+.lr-status-delayed { background: #ffedd5; color: #9a3412; }
+.lr-status-exception { background: #fee2e2; color: #991b1b; }
+.lr-status-cancelled { background: #f1f5f9; color: #475569; }
+
+/* Timeline Stepper */
+.lr-stepper {
+  display: flex;
+  justify-content: space-between;
+  margin: 24px 0 32px;
+  position: relative;
+}
+
+.lr-stepper::before {
+  content: '';
+  position: absolute;
+  top: 14px;
+  left: 30px;
+  right: 30px;
+  height: 3px;
+  background: #e2e8f0;
+  z-index: 1;
+}
+
+.lr-step-node {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.lr-step-dot {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #f1f5f9;
+  border: 3px solid #cbd5e1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  transition: all 0.2s;
+}
+
+.lr-step-node.completed .lr-step-dot {
+  background: #10b981;
+  border-color: #10b981;
+  color: #ffffff;
+}
+
+.lr-step-node.active .lr-step-dot {
+  background: #3b82f6;
+  border-color: #1d4ed8;
+  color: #ffffff;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.25);
+}
+
+.lr-step-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #475569;
+}
+
+/* Timeline Vertical Events */
+.lr-events-timeline {
+  position: relative;
+  padding-left: 28px;
+  margin: 20px 0;
+}
+
+.lr-events-timeline::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 9px;
+  width: 2px;
+  background: #e2e8f0;
+}
+
+.lr-event-item {
+  position: relative;
+  margin-bottom: 20px;
+}
+
+.lr-event-dot {
+  position: absolute;
+  left: -28px;
+  top: 4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 3px solid #3b82f6;
+}
+
+.lr-event-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 14px 18px;
+}
+
+.lr-event-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.lr-event-status {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.lr-event-time {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.lr-event-desc {
+  font-size: 13px;
+  color: #475569;
+  line-height: 1.4;
+  margin: 0;
+}

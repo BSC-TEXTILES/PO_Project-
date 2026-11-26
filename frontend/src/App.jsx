@@ -51,6 +51,11 @@ import ProfilePage from './pages/ProfilePage.jsx';
 import ProfileModal from './components/ProfileModal.jsx';
 import CookieConsent from './components/CookieConsent.jsx';
 import { PrivacyPolicy, Terms, Security } from './pages/Legal.jsx';
+import LRTrackingLayout from './pages/LRTracking/LRTrackingLayout.jsx';
+import LRDashboard from './pages/LRTracking/LRDashboard.jsx';
+import LRUpload from './pages/LRTracking/LRUpload.jsx';
+import LRTrackOrder from './pages/LRTracking/LRTrackOrder.jsx';
+import LRGoodsReceiving from './pages/LRTracking/LRGoodsReceiving.jsx';
 
 function RequireAuth({ children, permission, superAdmin }) {
   const { user, hasPermission, loading, isSignedIn } = useAuth();
@@ -125,6 +130,13 @@ export default function App() {
             <Route path="/purchase-orders" element={<RequireAuth permission="po.view"><POList /></RequireAuth>} />
             <Route path="/purchase-orders/new" element={<RequireAuth permission="po.create"><POCreate /></RequireAuth>} />
             <Route path="/purchase-orders/:id" element={<RequireAuth><PODetails /></RequireAuth>} />
+            {/* LR Tracking Module — Available to all authenticated users */}
+            <Route path="/lr-tracking" element={<RequireAuth><LRTrackingLayout /></RequireAuth>}>
+              <Route index element={<LRDashboard />} />
+              <Route path="upload" element={<LRUpload />} />
+              <Route path="track" element={<LRTrackOrder />} />
+              <Route path="receiving" element={<LRGoodsReceiving />} />
+            </Route>
             <Route path="/calendar" element={<RequireAuth permission="calendar.view"><Calendar /></RequireAuth>} />
             <Route path="/approvals" element={<RequireAuth permission="approvals.view"><Approvals /></RequireAuth>} />
             <Route path="/receipts" element={<RequireAuth permission="receipt.view"><Receipts /></RequireAuth>} />
