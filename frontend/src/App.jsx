@@ -97,6 +97,7 @@ export default function App() {
 
   useEffect(() => {
     setMobileMenuOpen(false);
+    document.getElementById('main-content')?.scrollTo?.({ top: 0, left: 0 });
   }, [location.pathname]);
 
   useEffect(() => {
@@ -138,25 +139,26 @@ export default function App() {
 
   return (
     <div className={`shell ${collapsed ? 'collapsed' : ''}`}>
+      <a className="skip-link" href="#main-content">Skip to main content</a>
       <Sidebar
         collapsed={collapsed}
         onToggle={() => setCollapsed((c) => !c)}
         mobileOpen={mobileMenuOpen}
         onCloseMobile={() => setMobileMenuOpen(false)}
       />
-      <div className="main">
+      <div className="main" inert={mobileMenuOpen ? '' : undefined}>
         <Topbar collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)} onOpenMobile={() => setMobileMenuOpen(true)} />
-        <main className="content">
+        <main className="content" id="main-content" tabIndex={-1}>
           {/* Mandatory profile completion for admin-created accounts */}
           {user && !user.profileUpdatedAt && <ProfileModal />}
-          <ErrorBoundary>
+          <ErrorBoundary key={location.pathname}>
             <Suspense fallback={<PageSkeleton />}>
               <Routes>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<RequireAuth permission="dashboard.view"><Dashboard /></RequireAuth>} />
                 <Route path="/purchase-orders" element={<RequireAuth permission="po.view"><POList /></RequireAuth>} />
                 <Route path="/purchase-orders/new" element={<RequireAuth permission="po.create"><POCreate /></RequireAuth>} />
-                <Route path="/purchase-orders/:id" element={<RequireAuth><PODetails /></RequireAuth>} />
+                <Route path="/purchase-orders/:id" element={<RequireAuth permission="po.view"><PODetails /></RequireAuth>} />
 
                 {/* LR Tracking Module — Available to all authenticated users */}
                 <Route path="/lr-tracking" element={<RequireAuth><LRTrackingLayout /></RequireAuth>}>
@@ -171,7 +173,7 @@ export default function App() {
                 <Route path="/receipts" element={<RequireAuth permission="receipt.view"><Receipts /></RequireAuth>} />
                 <Route path="/masters" element={<RequireAuth permission="masters.view"><Masters /></RequireAuth>} />
                 <Route path="/catalogue" element={<RequireAuth permission="catalogue.view"><Catalogue /></RequireAuth>} />
-                <Route path="/collection/:deptKey" element={<RequireAuth><CollectionView /></RequireAuth>} />
+                <Route path="/collection/:deptKey" element={<RequireAuth permission="catalogue.view"><CollectionView /></RequireAuth>} />
                 <Route path="/chat" element={<RequireAuth permission="chat.view"><Chat /></RequireAuth>} />
                 <Route path="/users" element={<RequireAuth permission="users.manage"><Users /></RequireAuth>} />
                 <Route path="/reports" element={<RequireAuth permission="reports.view"><Reports /></RequireAuth>} />
@@ -182,7 +184,7 @@ export default function App() {
                 <Route path="/dealers" element={<RequireAuth permission="dealers.view"><Dealers /></RequireAuth>} />
                 <Route path="/company" element={<RequireAuth permission="company.view"><CompanySettings /></RequireAuth>} />
                 <Route path="/attachments" element={<RequireAuth permission="attachments.view"><Attachments /></RequireAuth>} />
-                <Route path="/checkout" element={<RequireAuth><Checkout /></RequireAuth>} />
+                <Route path="/checkout" element={<RequireAuth permission="po.view"><Checkout /></RequireAuth>} />
                 <Route path="/products" element={<RequireAuth permission="products.view"><Products /></RequireAuth>} />
                 <Route path="/products/new" element={<RequireAuth permission="products.create"><ProductForm /></RequireAuth>} />
                 <Route path="/products/:id" element={<RequireAuth permission="products.view"><ProductDetail /></RequireAuth>} />

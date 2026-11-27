@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../auth.jsx';
 import api, { errMessage } from '../api.js';
@@ -9,6 +9,8 @@ export default function SignUpPage() {
   const [form, setForm] = useState({ email: '', username: '', fullName: '', password: '', confirmPassword: '' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const pending = useRef(false);
+  const [created, setCreated] = useState(false);
 
   useEffect(() => {
     if (isSignedIn) navigate('/dashboard', { replace: true });
@@ -20,6 +22,7 @@ export default function SignUpPage() {
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (pending.current) return;
     setError('');
 
     if (form.password !== form.confirmPassword) {
@@ -27,6 +30,7 @@ export default function SignUpPage() {
       return;
     }
 
+    pending.current = true;
     setBusy(true);
     try {
       // Note: self-signup creates the account; admin assigns roles later.
@@ -37,19 +41,20 @@ export default function SignUpPage() {
         fullName: form.fullName.trim(),
         password: form.password,
       });
-      // Auto-login after signup
-      const { data } = await api.post('/auth/login', { email: form.email.trim(), password: form.password });
-      login(data.token, data.user);
-      navigate('/dashboard', { replace: true });
+      setCreated(true);
+      setForm(prev => ({ ...prev, password: '', confirmPassword: '' }));
     } catch (err) {
       setError(errMessage(err));
     } finally {
+      pending.current = false;
       setBusy(false);
     }
   }
 
+  if (created) return <main className="registration-complete"><section className="card"><h1>Account created</h1><p>Your account has been created. Your administrator can assign the roles and access you need.</p><Link className="btn primary" to="/login">Continue to sign in</Link></section></main>;
+
   return (
-    <div className="login-page">
+    <div className="login-page signup-page">
       <div className="login-left">
         <button
           type="button"
@@ -118,14 +123,14 @@ export default function SignUpPage() {
             <p>Sign up for BSC Purchase Order Management System</p>
           </div>
 
-          {error && <div className="alert error" style={{ width: '100%', maxWidth: 400, marginBottom: 16 }}>{error}</div>}
+          {error && <div role="alert" className="alert error" style={{ width: '100%', maxWidth: 400, marginBottom: 16 }}>{error}</div>}
 
           <form onSubmit={handleSubmit} style={{ width: '100%', maxWidth: 400 }}>
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', marginBottom: 4, fontWeight: 500, fontSize: 14 }}>Full Name</label>
+              <label htmlFor="signup-fullName" style={{ display: 'block', marginBottom: 4, fontWeight: 500, fontSize: 14 }}>Full Name</label>
               <input
                 type="text"
-                value={form.fullName}
+                id="signup-fullName" value={form.fullName}
                 onChange={(e) => update('fullName', e.target.value)}
                 required
                 placeholder="John Doe"
@@ -133,10 +138,10 @@ export default function SignUpPage() {
               />
             </div>
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', marginBottom: 4, fontWeight: 500, fontSize: 14 }}>Username</label>
+              <label htmlFor="signup-username" style={{ display: 'block', marginBottom: 4, fontWeight: 500, fontSize: 14 }}>Username</label>
               <input
                 type="text"
-                value={form.username}
+                id="signup-username" value={form.username}
                 onChange={(e) => update('username', e.target.value)}
                 required
                 placeholder="johndoe"
@@ -144,10 +149,10 @@ export default function SignUpPage() {
               />
             </div>
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', marginBottom: 4, fontWeight: 500, fontSize: 14 }}>Email</label>
+              <label htmlFor="signup-email" style={{ display: 'block', marginBottom: 4, fontWeight: 500, fontSize: 14 }}>Email</label>
               <input
                 type="email"
-                value={form.email}
+                id="signup-email" value={form.email}
                 onChange={(e) => update('email', e.target.value)}
                 required
                 placeholder="you@company.com"
@@ -155,10 +160,10 @@ export default function SignUpPage() {
               />
             </div>
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', marginBottom: 4, fontWeight: 500, fontSize: 14 }}>Password</label>
+              <label htmlFor="signup-password" style={{ display: 'block', marginBottom: 4, fontWeight: 500, fontSize: 14 }}>Password</label>
               <input
                 type="password"
-                value={form.password}
+                id="signup-password" value={form.password}
                 onChange={(e) => update('password', e.target.value)}
                 required
                 minLength={10}
@@ -167,10 +172,10 @@ export default function SignUpPage() {
               />
             </div>
             <div style={{ marginBottom: 24 }}>
-              <label style={{ display: 'block', marginBottom: 4, fontWeight: 500, fontSize: 14 }}>Confirm Password</label>
+              <label htmlFor="signup-confirmPassword" style={{ display: 'block', marginBottom: 4, fontWeight: 500, fontSize: 14 }}>Confirm Password</label>
               <input
                 type="password"
-                value={form.confirmPassword}
+                id="signup-confirmPassword" value={form.confirmPassword}
                 onChange={(e) => update('confirmPassword', e.target.value)}
                 required
                 placeholder="Repeat your password"

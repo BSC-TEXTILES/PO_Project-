@@ -2,7 +2,7 @@ import { Router } from 'express';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { query } from '../config/db.js';
-import { authenticate, requirePermission } from '../middleware/auth.js';
+import { authenticate, requireAnyPermission } from '../middleware/auth.js';
 import { badRequest, notFoundError, ah } from '../utils/httpError.js';
 import { logAudit } from '../utils/audit.js';
 import {
@@ -21,7 +21,7 @@ const importFilePath = (hist) => path.join(uploadsDir, hist.storage_key || '');
 
 const r = Router();
 r.use(authenticate);
-r.use(requirePermission('masters.manage'));
+r.use(requireAnyPermission(['masters.manage', 'import.manage']));
 
 function validateUploadFile(file) {
   if (!file) throw badRequest('No file received (multipart field "file")');
@@ -117,6 +117,22 @@ r.get('/:id', ah(async (req, res) => {
   res.json({ data: { importId: hist.id, preview } });
 }));
 
+// Re-stage custom column mappings without applying product changes.
+r.post('/:id/preview', ah(async (req, res) => {
+  const mapping = req.body?.mapping;
+  if (!mapping || typeof mapping !== 'object' || Array.isArray(mapping)) throw badRequest('A field mapping is required.');
+  const hist = (await query('SELECT * FROM import_history WHERE id=$1', [req.params.id])).rows[0];
+  if (!hist) throw notFoundError('Import session not found');
+  if (hist.status !== 'awaiting_confirmation') throw badRequest('Only imports awaiting confirmation can be previewed.');
+  const parsed = await parseImportFile(importFilePath(hist), hist.file_type);
+  const { records, summary, fields } = await stageSheets(db, parsed.sheets, mapping);
+  const preview = buildPreviewPayload(records, mapping, summary, {
+    fileName: hist.file_name, fileType: hist.file_type, fileSizeBytes: hist.file_size_bytes,
+    totalRows: hist.rows_found || 0,
+  }, fields);
+  res.json({ data: { importId: hist.id, preview } });
+}));
+
 // POST /api/import/:id/confirm - re-validate, execute import transactionally
 r.post('/:id/confirm', ah(async (req, res) => {
   const importId = req.params.id;
@@ -143,15 +159,6 @@ r.post('/:id/confirm', ah(async (req, res) => {
   const result = await executeImport(req.user.id, importId, records);
   const status = result.failed > 0 && result.imported === 0 && result.updated === 0 ? 'failed'
     : result.failed > 0 ? 'partially_imported' : 'imported';
-  const errorSummary = result.failed > 0 ? 'Failed: ' + result.failed + ' row(s). See import records for details.' : null;
-  await query('UPDATE import_history SET status=$2, imported_count=$3, updated_count=$4, failed_count=$5, finished_at=now(), error_summary=$6 WHERE id=$1',
-    [importId, status, result.imported, result.updated, result.failed, errorSummary]);
-  for (const rec of records) {
-    await query(
-      'INSERT INTO import_records (import_id, row_index, sheet, original_values, mapped_values, operation, warnings, errors, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,now())',
-      [importId, rec.rowIndex, rec.sheet, JSON.stringify(rec.extracted), JSON.stringify(rec.mapped), rec.action, JSON.stringify(rec.warnings || []), JSON.stringify(rec.errors || [])],
-    );
-  }
   await logAudit(db, { userId: req.user.id, role: req.user.roles.join(','), actionType: 'import_confirm', entityType: 'product', entityId: importId, afterValue: { imported: result.imported, updated: result.updated, failed: result.failed }, divisionId: null });
   cleanupTemp(null);
   res.json({ data: { importId, status, imported: result.imported, updated: result.updated, failed: result.failed, perRow: result.perRow.slice(0, 200) } });
@@ -179,7 +186,8 @@ r.delete('/:id', ah(async (req, res) => {
   if (hist.status !== 'awaiting_confirmation') {
     throw badRequest('Only "awaiting_confirmation" imports can be cancelled (this one is "' + hist.status + '").');
   }
-  await query('UPDATE import_history SET status=$2, finished_at=now() WHERE id=$1', [req.params.id, 'cancelled']);
+  const cancelled = await query("UPDATE import_history SET status=$2, finished_at=now() WHERE id=$1 AND status='awaiting_confirmation'", [req.params.id, 'cancelled']);
+  if (!cancelled.rowCount) throw badRequest('This import has already been processed or cancelled.');
   await logAudit(db, { userId: req.user.id, role: req.user.roles.join(','), actionType: 'import_cancel', entityType: 'product', entityId: req.params.id, afterValue: { fileName: hist.file_name } });
   res.json({ ok: true, message: 'Import cancelled — no data was saved.' });
 }));

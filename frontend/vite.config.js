@@ -43,6 +43,7 @@ export default defineConfig(({ mode }) => {
             });
           },
         },
+        '/uploads': { target: backendTarget, changeOrigin: true },
         '/ws': {
           target: backendTarget,
           ws: true,

@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import api, { errMessage } from '../api.js';
 import { useAuth } from '../auth.jsx';
+import { useDebounce } from '../hooks/useDebounce.js';
 import Modal from '../components/Modal.jsx';
 import { TableSkeleton } from '../components/Skeletons.jsx';
 
@@ -22,14 +23,19 @@ export default function Products({ gender }) {
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
   const [deleteModal, setDeleteModal] = useState(null);
+  const [archiving, setArchiving] = useState(false);
+  const archivePending = useRef(false);
+  const requestId = useRef(0);
+  const debouncedSearch = useDebounce(search, 300);
 
   const load = () => {
+    const request = ++requestId.current;
     setLoading(true);
     const params = {
       page,
       limit: 20,
       pageSize: 20,
-      search,
+      search: debouncedSearch,
       category,
       categoryId: category,
       brand,
@@ -39,18 +45,22 @@ export default function Products({ gender }) {
     };
     if (gender) params.gender = gender;
     api.get('/products', { params })
-      .then((r) => { setRows(r.data.data || []); setTotal(r.data.total || 0); })
-      .catch((e) => setError(errMessage(e)))
-      .finally(() => setLoading(false));
+      .then((r) => { if (request !== requestId.current) return; setError(''); setRows(r.data.data || []); setTotal(r.data.total || 0); })
+      .catch((e) => { if (request === requestId.current) setError(errMessage(e)); })
+      .finally(() => { if (request === requestId.current) setLoading(false); });
   };
-  useEffect(load, [page, search, category, brand, status, sort, gender]);
+  useEffect(load, [page, debouncedSearch, category, brand, status, sort, gender]);
   useEffect(() => {
     api.get('/categories').then((r) => setCategories(r.data.data || [])).catch(() => {});
     api.get('/brands').then((r) => setBrands(r.data.data || [])).catch(() => {});
   }, []);
 
   const archiveProduct = async (id) => {
+    if (archivePending.current) return;
+    archivePending.current = true;
+    setArchiving(true);
     try { await api.patch(`/products/${id}`, { status: 'archived' }); setDeleteModal(null); load(); } catch (e) { setError(errMessage(e)); }
+    finally { archivePending.current = false; setArchiving(false); }
   };
 
   const displayedRows = rows.filter((p) => {
@@ -146,14 +156,14 @@ export default function Products({ gender }) {
       </div>
 
       {deleteModal && (
-        <Modal title="Archive Product" onClose={() => setDeleteModal(null)}>
+        <Modal busy={archiving} title="Archive Product" onClose={() => setDeleteModal(null)}>
           <div className="modal-body">
             <p>Are you sure you want to archive <strong>{deleteModal.name}</strong>?</p>
             <p style={{ fontSize: 12, color: '#6b7280' }}>This product will be marked as archived but will remain in the system for historical reference.</p>
           </div>
           <div className="modal-actions">
-            <button className="btn" onClick={() => setDeleteModal(null)}>Cancel</button>
-            <button className="btn danger" onClick={() => archiveProduct(deleteModal.id)}>Archive</button>
+            <button className="btn" disabled={archiving} onClick={() => setDeleteModal(null)}>Cancel</button>
+            <button className="btn danger" disabled={archiving} onClick={() => archiveProduct(deleteModal.id)}>{archiving ? 'Archiving…' : 'Archive'}</button>
           </div>
         </Modal>
       )}

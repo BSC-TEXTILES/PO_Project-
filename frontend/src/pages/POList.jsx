@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api, { API_BASE, errMessage } from '../api.js';
 import StatusChip from '../components/StatusChip.jsx';
@@ -74,17 +74,19 @@ export default function POList() {
     api.get('/sections').then((r) => setSections(r.data.data || [])).catch(() => {});
   }, []);
 
+  const requestId = useRef(0);
+  const apiFilters = useMemo(() => ({ ...filters, search: debouncedSearch }), [debouncedSearch, filters.status, filters.departmentId, filters.sectionId, filters.from, filters.to]);
   const loadData = useCallback(() => {
+    const request = ++requestId.current;
     setLoading(true);
     const params = { page, pageSize };
     // Use debounced search for API calls, but keep immediate filters for other fields
-    const apiFilters = { ...filters, search: debouncedSearch };
     Object.entries(apiFilters).forEach(([k, v]) => { if (v) params[k] = v; });
     api.get('/purchase-orders', { params })
-      .then((r) => { setRows(r.data.data || []); setTotal(r.data.total || 0); setError(''); })
-      .catch((e) => setError(errMessage(e)))
-      .finally(() => setLoading(false));
-  }, [page, filters, debouncedSearch]);
+      .then((r) => { if (request !== requestId.current) return; setRows(r.data.data || []); setTotal(r.data.total || 0); setError(''); })
+      .catch((e) => { if (request === requestId.current) setError(errMessage(e)); })
+      .finally(() => { if (request === requestId.current) setLoading(false); });
+  }, [page, apiFilters]);
 
   useEffect(() => {
     loadData();
@@ -205,18 +207,18 @@ export default function POList() {
       ) : (
         <div className="donezo-kpis">
           <button type="button" className={`donezo-stat-card polist-card kpi-green${!filters.status ? ' active' : ''}`} onClick={() => applyStatus('')} title="Show all orders">
-            <div className="st-head"><span>Total Orders</span> <div className="st-arrow">↗</div></div>
+            <div className="st-head"><span>Total Orders</span> </div>
             <div className="st-val">{kpis ? kpis.total : '…'}</div>
-            <div className="st-note"><span className="st-up">↗</span> All statuses · authorized scope</div>
+            <div className="st-note"> All statuses · authorized scope</div>
           </button>
           {KPI_CARDS.map((card) => (
             <button type="button" key={card.key}
               className={`donezo-stat-card polist-card${filters.status === card.apply ? ' active' : ''}`}
               onClick={() => applyStatus(filters.status === card.apply ? '' : card.apply)}
               title={`Show ${card.title.toLowerCase()} orders`}>
-              <div className="st-head"><span>{card.title}</span> <div className="st-arrow">↗</div></div>
+              <div className="st-head"><span>{card.title}</span> </div>
               <div className="st-val">{kpis ? kpis[card.key] : '…'}</div>
-              <div className="st-note"><span className="st-up">↑</span> {card.note}</div>
+              <div className="st-note"> {card.note}</div>
             </button>
           ))}
         </div>

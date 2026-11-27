@@ -5,7 +5,7 @@ import { query, pool, newId } from '../config/db.js';
 import { authenticate, generateSessionToken, hashToken, loadUser, loadUserByEmail, REFRESH_TOKEN_MINUTES } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/security.js';
 import { validate } from '../middleware/validate.js';
-import { ah, badRequest, tooManyRequests } from '../utils/httpError.js';
+import { ah, badRequest, tooManyRequests, ApiError } from '../utils/httpError.js';
 import { logAudit } from '../utils/audit.js';
 import { z } from 'zod';
 
@@ -75,7 +75,8 @@ r.post('/login', rateLimit(10, 60 * 1000), validate({ body: loginSchema }), ah(a
   }
 
   if (mfaEnabled) {
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    if (process.env.NODE_ENV === 'production') throw new ApiError(503, 'Authentication code delivery is not configured. Contact your administrator.');
+    const otp = crypto.randomInt(100000, 1000000).toString();
     const expiresAt = new Date(Date.now() + 5 * 60000).toISOString();
     await query('UPDATE users SET mfa_otp = $1, mfa_otp_expires_at = $2 WHERE id = $3', [otp, expiresAt, user.id]);
     
@@ -270,7 +271,7 @@ const reqOtpSchema = z.object({
   currentPassword: z.string().min(1, 'Current password is required'),
 });
 
-r.post('/change-password/request-otp', authenticate, validate({ body: reqOtpSchema }), ah(async (req, res) => {
+r.post('/change-password/request-otp', authenticate, rateLimit(5, 60 * 1000), validate({ body: reqOtpSchema }), ah(async (req, res) => {
   const { currentPassword } = req.body;
   const { rows } = await query('SELECT password_hash FROM users WHERE id = $1', [req.user.id]);
   const userRow = rows[0];
@@ -279,9 +280,11 @@ r.post('/change-password/request-otp', authenticate, validate({ body: reqOtpSche
   const valid = await bcrypt.compare(currentPassword, userRow.password_hash);
   if (!valid) throw badRequest('Incorrect current password');
 
+  if (process.env.NODE_ENV === 'production') throw new ApiError(503, 'Password verification delivery is not configured. Contact your administrator.');
+
   // Generate two 6-digit OTPs
-  const emailOtp = Math.floor(100000 + Math.random() * 900000).toString();
-  const phoneOtp = Math.floor(100000 + Math.random() * 900000).toString();
+  const emailOtp = crypto.randomInt(100000, 1000000).toString();
+  const phoneOtp = crypto.randomInt(100000, 1000000).toString();
   
   // Set expiration to 10 minutes from now
   const expiresAt = new Date(Date.now() + 10 * 60000).toISOString();
@@ -307,7 +310,7 @@ const verifyOtpSchema = z.object({
   newPassword: z.string().min(8, 'New password must be at least 8 characters'),
 });
 
-r.post('/change-password/verify', authenticate, validate({ body: verifyOtpSchema }), ah(async (req, res) => {
+r.post('/change-password/verify', authenticate, rateLimit(5, 60 * 1000), validate({ body: verifyOtpSchema }), ah(async (req, res) => {
   const { emailOtp, phoneOtp, newPassword } = req.body;
   let record;
 

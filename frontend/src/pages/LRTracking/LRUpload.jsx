@@ -48,6 +48,7 @@ export default function LRUpload() {
 
     try {
       const res = await api.post('/lr/upload', data, {
+        timeout: 120000,
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 

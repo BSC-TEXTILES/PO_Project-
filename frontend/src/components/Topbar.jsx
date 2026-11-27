@@ -29,12 +29,7 @@ const ROLE_LABELS = {
   auditor: 'Auditor',
 };
 
-const LOCATIONS = [
-  'All Locations',
-  'Belagavi',
-  'Davanagere',
-  'Shivamogga',
-];
+const LOCATIONS = ['All Locations'];
 
 function roleLabels(roles = []) {
   return roles.map((r) => ROLE_LABELS[r] || String(r).replace(/_/g, ' ')).join(', ');
@@ -58,9 +53,14 @@ export default function Topbar({ collapsed, onToggle, onOpenMobile }) {
   const [now, setNow] = useState(new Date());
   const [q, setQ] = useState('');
   const [results, setResults] = useState(null);
+  const [searchError, setSearchError] = useState('');
+  const [searchLoading, setSearchLoading] = useState(false);
   const [openMenu, setOpenMenu] = useState(null); // 'search' | 'bell' | 'profile' | 'location'
   const [notifications, setNotifications] = useState([]);
   const [unread, setUnread] = useState(0);
+  const [notificationError, setNotificationError] = useState('');
+  const [marking, setMarking] = useState(false);
+  const markingRef = useRef(false);
   const [toast, setToast] = useState(null);
   const [theme, setTheme] = useState(() => localStorage.getItem('poms_theme') || 'light');
   const [installPrompt, setInstallPrompt] = useState(null);
@@ -76,7 +76,7 @@ export default function Topbar({ collapsed, onToggle, onOpenMobile }) {
       if (!active) return;
       const divs = r.data?.data || [];
       if (user.isSuperAdmin || divs.length >= 3) {
-        const names = divs.length ? divs.map((d) => d.name) : ['Belagavi', 'Davanagere', 'Shivamogga'];
+        const names = divs.map((d) => d.name);
         setAvailableLocations(['All Locations', ...names]);
       } else if (divs.length > 0) {
         const names = divs.map((d) => d.name);
@@ -123,8 +123,8 @@ export default function Topbar({ collapsed, onToggle, onOpenMobile }) {
   useEffect(() => {
     api.get('/notifications').then((r) => {
       setNotifications(r.data.data || []);
-      setUnread(r.data.unread);
-    }).catch(() => {});
+      setUnread(r.data.unread || 0);
+    }).catch(error => setNotificationError(errMessage(error)));
   }, []);
 
   // Live notifications over /ws/notify — badge + toast, no polling.
@@ -186,10 +186,11 @@ export default function Topbar({ collapsed, onToggle, onOpenMobile }) {
     return () => document.removeEventListener('mousedown', close);
   }, []);
 
-  // ⌘F / Ctrl+F focuses the global search bar (matches the "⌘F" chip).
+  // Cmd+K / Ctrl+K focuses the global search bar (matches the "Ctrl K" chip).
   useEffect(() => {
     const onKey = (e) => {
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
+      if (e.key === 'Escape') setOpenMenu(null);
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         searchRef.current?.focus();
       }
@@ -214,6 +215,9 @@ export default function Topbar({ collapsed, onToggle, onOpenMobile }) {
       return;
     }
     let active = true;
+    setSearchLoading(true);
+    setSearchError('');
+    setOpenMenu('search');
     api.get('/search', { params: { q: debouncedQuery.trim() } })
       .then((r) => {
         if (active) {
@@ -221,26 +225,33 @@ export default function Topbar({ collapsed, onToggle, onOpenMobile }) {
           setOpenMenu('search');
         }
       })
-      .catch(() => { if (active) setResults(null); });
+      .catch((error) => { if (active) { setResults(null); setSearchError(errMessage(error)); } })
+      .finally(() => { if (active) setSearchLoading(false); });
     return () => { active = false; };
   }, [debouncedQuery]);
 
   function goSearch(item, kind) {
     setOpenMenu(null); setQ(''); setResults(null);
     if (kind === 'po') navigate(`/purchase-orders/${item.id}`);
-    if (kind === 'product') navigate(`/catalogue?q=${encodeURIComponent(item.sku)}`);
+    if (kind === 'product') navigate(hasPermission('products.view') ? `/products/${item.id}` : `/catalogue?q=${encodeURIComponent(item.sku)}`);
     if (kind === 'user' && hasPermission('users.manage')) navigate('/users');
   }
 
   async function markAll() {
-    await api.post('/notifications/read-all').catch(() => {});
-    setNotifications((list) => list.map((n) => ({ ...n, is_read: true })));
-    setUnread(0);
+    if (markingRef.current) return;
+    markingRef.current = true; setMarking(true); setNotificationError('');
+    try {
+      await api.post('/notifications/read-all');
+      setNotifications((list) => list.map((n) => ({ ...n, is_read: true })));
+      setUnread(0);
+    } catch (error) { setNotificationError(errMessage(error)); }
+    finally { markingRef.current = false; setMarking(false); }
   }
 
   async function markOne(n) {
     if (!n.is_read) {
-      api.post(`/notifications/${n.id}/read`).catch(() => {});
+      try { await api.post(`/notifications/${n.id}/read`); }
+      catch (error) { setNotificationError(errMessage(error)); return; }
       setUnread((u) => Math.max(0, u - 1));
       setNotifications((list) => list.map((x) => (x.id === n.id ? { ...x, is_read: true } : x)));
     }
@@ -295,14 +306,15 @@ export default function Topbar({ collapsed, onToggle, onOpenMobile }) {
         <input
           ref={searchRef}
           value={q}
-          placeholder="Search POs, products, suppliers, LR…"
+          placeholder="Search orders, products, suppliers…"
           className="donezo-search-input"
           aria-label="Search purchase orders, products, suppliers and users"
           onChange={(e) => onSearch(e.target.value)}
           onFocus={() => results && setOpenMenu('search')}
         />
-        <div className="search-shortcut">⌘F</div>
-        {openMenu === 'search' && r && (
+        <div className="search-shortcut">Ctrl K</div>
+        {openMenu === 'search' && (searchLoading || searchError) && <div className="dropdown search-drop" role="status"><div className="drop-empty">{searchLoading ? 'Searching…' : searchError}</div></div>}
+        {openMenu === 'search' && r && !searchLoading && !searchError && (
           <div className="dropdown search-drop">
             <div className="drop-section">Purchase Orders</div>
             {(r.purchaseOrders || []).map((p) => (
@@ -352,9 +364,10 @@ export default function Topbar({ collapsed, onToggle, onOpenMobile }) {
           </button>
         {openMenu === 'bell' && (
           <div className="dropdown bell-drop">
+            {notificationError && <div className="alert error" role="alert">{notificationError}</div>}
             <div className="drop-head">
               <strong>Notifications {unread > 0 && <span className="chip">{unread} new</span>}</strong>
-              <button className="btn ghost sm" onClick={markAll}>Mark all read</button>
+              <button className="btn ghost sm" disabled={marking || !unread} onClick={markAll}>{marking ? 'Updating…' : 'Mark all read'}</button>
             </div>
             <div className="drop-scroll">
               {notifications.map((n) => (
@@ -399,7 +412,7 @@ export default function Topbar({ collapsed, onToggle, onOpenMobile }) {
                     </span>
                     <span className="right row" style={{ gap: 6 }}>
                       {it.grandTotal != null && <strong>₹{Number(it.grandTotal).toLocaleString('en-IN')}</strong>}
-                      <button className="btn sm danger" onClick={() => cart.removeItem(it.id)}>✕</button>
+                      <button className="btn sm danger" aria-label={`Remove ${it.poNumber} from cart`} onClick={() => cart.removeItem(it.id)}>✕</button>
                     </span>
                   </div>
                 ))}

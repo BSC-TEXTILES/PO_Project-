@@ -7,9 +7,13 @@ import api, { setTokenGetter } from './api.js';
 // complete summary invoice is generated. Persisted per browser.
 const CartContext = createContext(null);
 
-const KEY = 'poms_cart';
-
 export function CartProvider({ children }) {
+  const { user } = useAuth();
+  const key = user?.id ? `poms_cart:${user.id}` : 'poms_cart:anonymous';
+  return <UserCartProvider key={key} storageKey={key}>{children}</UserCartProvider>;
+}
+
+function UserCartProvider({ children, storageKey: KEY }) {
   const [items, setItems] = useState(() => {
     try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; }
   });
@@ -89,8 +93,7 @@ export function AuthProvider({ children }) {
 
   // Expose the JWT getter to the Axios interceptor
   useEffect(() => {
-    const token = getStoredToken();
-    setTokenGetter(token ? () => Promise.resolve(token) : null);
+    setTokenGetter(() => Promise.resolve(getStoredToken()));
     return () => setTokenGetter(null);
   }, [rbacUser]);
 
@@ -105,9 +108,9 @@ export function AuthProvider({ children }) {
     try {
       const { data } = await api.get('/auth/me');
       setRbacUser(data.user);
-    } catch {
-      // Token invalid or expired — clear it
-      setStoredToken(null);
+    } catch (error) {
+      // A temporary outage must not invalidate a valid session.
+      if (error.response?.status === 401) setStoredToken(null);
       setRbacUser(null);
     } finally {
       setLoading(false);
@@ -121,6 +124,7 @@ export function AuthProvider({ children }) {
   // Login: called from Login.jsx after successful POST /api/auth/login
   function login(token, user) {
     setStoredToken(token);
+    setTokenGetter(() => Promise.resolve(getStoredToken()));
     setRbacUser(user);
     fetchedRef.current = true;
     // Refetch RBAC data with the new token to ensure everything is in sync
@@ -160,6 +164,11 @@ export function AuthProvider({ children }) {
   async function logout() {
     try { await api.post('/auth/logout').catch(() => {}); } catch { /* ignore */ }
     setStoredToken(null);
+    setTokenGetter(null);
+    localStorage.removeItem('poms_cart');
+    if (rbacUser?.id) localStorage.removeItem(`poms_cart:${rbacUser.id}`);
+    clearSection();
+    clearLocation();
     setRbacUser(null);
     setLoading(false);
     fetchedRef.current = false;

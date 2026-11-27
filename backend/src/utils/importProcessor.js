@@ -4,6 +4,7 @@
 // re-validates everything at that point).
 
 import { withTransaction, newId, nextNumber } from '../config/db.js';
+import { badRequest } from './httpError.js';
 import { computeProductProfit } from './pricing.js';
 import {
   mapField, productFieldOptions, defaultMappingFromHeaders,
@@ -194,6 +195,9 @@ export async function executeImport(userId, importId, records) {
   const out = { imported: 0, updated: 0, failed: 0, perRow: [] };
   const year = new Date().getFullYear();
   await withTransaction(async (client) => {
+    // Serialize confirmation of the same staged file across tabs and requests.
+    const { rows: sessions } = await client.query('SELECT status FROM import_history WHERE id=$1 FOR UPDATE', [importId]);
+    if (sessions[0]?.status !== 'awaiting_confirmation') throw badRequest('This import has already been processed or cancelled.');
     for (const rec of records) {
       const row = {
         rowIndex: rec.rowIndex, sheet: rec.sheet, action: rec.action,
@@ -291,6 +295,15 @@ export async function executeImport(userId, importId, records) {
         out.failed++;
         out.perRow.push(row);
       }
+    }
+    const status = out.failed > 0 && out.imported === 0 && out.updated === 0 ? 'failed' : out.failed > 0 ? 'partially_imported' : 'imported';
+    const errorSummary = out.failed ? 'Failed: ' + out.failed + ' row(s). See import records for details.' : null;
+    await client.query('UPDATE import_history SET status=$2, imported_count=$3, updated_count=$4, failed_count=$5, finished_at=now(), error_summary=$6 WHERE id=$1',
+      [importId, status, out.imported, out.updated, out.failed, errorSummary]);
+    for (let i = 0; i < out.perRow.length; i++) {
+      const row = out.perRow[i];
+      await client.query('INSERT INTO import_records (import_id, row_index, sheet, original_values, mapped_values, operation, warnings, errors, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,now())',
+        [importId, row.rowIndex, row.sheet, JSON.stringify(records[i].extracted), JSON.stringify(row.mapped), row.operation, JSON.stringify(row.warnings || []), JSON.stringify(row.errors || [])]);
     }
   });
   return out;

@@ -1,3 +1,4 @@
+import Modal from '../components/Modal.jsx';
 import { useEffect, useState, useMemo } from 'react';
 import api, { errMessage } from '../api.js';
 import { useAuth } from '../auth.jsx';
@@ -35,28 +36,23 @@ function RoleModal({ initial, onSave, onClose, busy }) {
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ background: '#fff', borderRadius: 12, width: 440, maxWidth: '95vw', boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}>
-        <div style={{ padding: '18px 22px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>{isEdit ? 'Edit Role' : 'Create New Role'}</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#6b7280' }}>×</button>
-        </div>
-        <form onSubmit={submit} style={{ padding: '20px 22px' }}>
+    <Modal title={isEdit ? 'Edit Role' : 'Create New Role'} onClose={onClose} busy={busy}>
+        <form onSubmit={submit}>
           <div style={{ marginBottom: 14 }}>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 4 }}>Role Name *</label>
-            <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required
+            <input aria-label="Role name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required
               style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }} />
           </div>
           {!isEdit && (
             <div style={{ marginBottom: 14 }}>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 4 }}>Role Code * <span style={{ color: '#9ca3af', fontWeight: 400 }}>(snake_case, e.g. purchase_lead)</span></label>
-              <input value={form.code} onChange={e => setForm({ ...form, code: e.target.value.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') })} required
+              <input aria-label="Role code" value={form.code} onChange={e => setForm({ ...form, code: e.target.value.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') })} required
                 style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, fontFamily: 'monospace', boxSizing: 'border-box' }} />
             </div>
           )}
           <div style={{ marginBottom: 18 }}>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 4 }}>Description</label>
-            <textarea value={form.description || ''} onChange={e => setForm({ ...form, description: e.target.value })} rows={2}
+            <textarea aria-label="Description" value={form.description || ''} onChange={e => setForm({ ...form, description: e.target.value })} rows={2}
               style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, resize: 'vertical', boxSizing: 'border-box' }} />
           </div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
@@ -66,8 +62,7 @@ function RoleModal({ initial, onSave, onClose, busy }) {
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -227,7 +222,7 @@ export default function Roles() {
       {/* Alert */}
       {msg.text && <Alert type={msg.type} onClose={() => setMsg({ type: '', text: '' })}>{msg.text}</Alert>}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 16, alignItems: 'start' }}>
+      <div className="roles-workspace">
 
         {/* ── Left panel: role list ── */}
         <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden' }}>
@@ -235,7 +230,7 @@ export default function Roles() {
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search roles…"
+              aria-label="Search roles" placeholder="Search roles…"
               style={{ width: '100%', padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }}
             />
           </div>
@@ -249,6 +244,8 @@ export default function Roles() {
               return (
                 <div
                   key={role.id}
+                  role="button" tabIndex={0} aria-pressed={isSelected}
+                  onKeyDown={e => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); selectRole(role); } }}
                   onClick={() => selectRole(role)}
                   style={{
                     padding: '11px 14px', cursor: 'pointer', borderBottom: '1px solid #f3f4f6',

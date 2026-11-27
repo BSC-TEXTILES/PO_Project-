@@ -483,3 +483,19 @@
   line-height: 1.4;
   margin: 0;
 }
+/* Shared workspace geometry and mobile shipment forms. */
+.lr-container { padding: 0; max-width: 1600px; }
+.lr-title-group h1 { color: var(--ink); font-size: clamp(1.4rem, 2vw, 1.85rem); letter-spacing: -.035em; }
+.lr-title-group p { color: var(--muted); font-size: .9375rem; line-height: 1.6; }
+.lr-nav-tabs { flex-wrap: wrap; background: var(--panel); border-color: var(--line); }
+.lr-nav-tab { min-height: 42px; font-size: .875rem; }
+.lr-nav-tab.active { background: var(--accent-light); color: var(--accent); box-shadow: none; }
+@media (max-width: 700px) {
+  .lr-container { padding: 0; }
+  .lr-nav-tabs { width: 100%; }
+  .lr-nav-tab { flex: 1 1 40%; padding: 10px; justify-content: center; }
+  .lr-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lr-title-group h1 { align-items: flex-start; }
+  .lr-title-group h1 svg { flex-shrink: 0; }
+  .lr-event-card-header { flex-wrap: wrap; gap: 8px; }
+}

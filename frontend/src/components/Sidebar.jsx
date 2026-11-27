@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { useEffect, useState, useRef } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import Icon from './Icon.jsx';
 import CollectionIcon from './CollectionIcon.jsx';
 import { useAuth } from '../auth.jsx';
@@ -106,6 +106,33 @@ function canSee(item, user) {
 
 export default function Sidebar({ collapsed, onToggle, mobileOpen, onCloseMobile }) {
   const { user } = useAuth();
+  const location = useLocation();
+  const [navQuery, setNavQuery] = useState('');
+  const asideRef = useRef(null);
+  const [smallScreen, setSmallScreen] = useState(() => window.matchMedia?.('(max-width: 900px)').matches ?? false);
+  useEffect(() => {
+    const media = window.matchMedia?.('(max-width: 900px)');
+    if (!media) return;
+    const update = () => setSmallScreen(media.matches);
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const previous = document.activeElement;
+    asideRef.current?.querySelector('button')?.focus();
+    const close = e => {
+      if (e.key === 'Escape') onCloseMobile();
+      if (e.key === 'Tab') {
+        const elements = [...asideRef.current.querySelectorAll('a, button, input, summary')].filter(el => el.getClientRects().length && !el.hidden);
+        const first = elements[0], last = elements.at(-1);
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
+      }
+    };
+    document.addEventListener('keydown', close);
+    return () => { document.removeEventListener('keydown', close); previous?.focus(); };
+  }, [mobileOpen, onCloseMobile]);
   const canBrowse = user.isSuperAdmin || user.permissions?.includes('masters.view') || user.permissions?.includes('catalogue.view');
   // Division Supervisor: strictly restricted — Men's collection and PO viewing
   // only. All other collections, masters and admin areas stay hidden.
@@ -115,7 +142,7 @@ export default function Sidebar({ collapsed, onToggle, mobileOpen, onCloseMobile
   // DEPARTMENT_GROUPS; any NEW department created by the Admin in
   // Master Data (e.g. Lycra Men's, Women's Ethnic, Cricket) is
   // fetched from the API and merged in — the nav grows automatically.
-  const [dynamicGroups, setDynamicGroups] = useState(DEPARTMENT_GROUPS);
+  const [dynamicGroups, setDynamicGroups] = useState([]);
   useEffect(() => {
     if (!canBrowse) return;
     api.get('/departments')
@@ -123,7 +150,7 @@ export default function Sidebar({ collapsed, onToggle, mobileOpen, onCloseMobile
         const deps = depRes.data?.data || [];
         const defaultsByKey = new Map(DEPARTMENT_GROUPS.map((g) => [g.key, g]));
         const groups = new Map();
-        DEPARTMENT_GROUPS.forEach((g) => groups.set(g.key, { ...g }));
+
         deps.forEach((dept) => {
           const key = (dept.code || dept.name || '').toLowerCase();
           if (!groups.has(key)) {
@@ -135,7 +162,7 @@ export default function Sidebar({ collapsed, onToggle, mobileOpen, onCloseMobile
             });
           }
         });
-        if (groups.size) setDynamicGroups([...groups.values()]);
+        setDynamicGroups([...groups.values()]);
       })
       .catch(() => {});
   }, [canBrowse]);
@@ -143,13 +170,15 @@ export default function Sidebar({ collapsed, onToggle, mobileOpen, onCloseMobile
   const departmentGroups = isSupervisor
     ? dynamicGroups.filter((g) => g.key === 'men')
     : dynamicGroups;
+  const sectionOrder = [null, 'Orders', 'Operations', 'LR Tracking', 'Collections', 'Master Data', 'Analytics', 'Media', 'Administration'];
+  const orderedSections = [...SECTIONS].sort((a, b) => sectionOrder.indexOf(a.label) - sectionOrder.indexOf(b.label));
   const navSections = isSupervisor
-    ? SECTIONS.filter((s) => !s.label || ['Collections', 'Orders'].includes(s.label))
-    : SECTIONS;
+    ? orderedSections.filter((s) => !s.label || ['Collections', 'Orders'].includes(s.label))
+    : orderedSections;
   return (
     <>
       {mobileOpen && <div className="sidebar-mobile-backdrop" onClick={onCloseMobile} />}
-      <aside className={`sidebar ${collapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}>
+      <aside ref={asideRef} inert={smallScreen && !mobileOpen ? '' : undefined} role={mobileOpen ? 'dialog' : undefined} aria-modal={mobileOpen ? true : undefined} aria-label="Primary navigation" className={`sidebar ${collapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}>
         <div className="sidebar-brand-wrapper">
           <div className="brand donezo-brand">
             <img src="/bsc-logo.png" alt="BSC Exclusive" className="brand-mark-img" style={{ width: 34, height: 34, borderRadius: 8 }} />
@@ -163,21 +192,22 @@ export default function Sidebar({ collapsed, onToggle, mobileOpen, onCloseMobile
           <button
             type="button"
             className="sidebar-hamburger-btn"
-            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={mobileOpen ? 'Close navigation' : collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             onClick={mobileOpen ? onCloseMobile : onToggle}
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={mobileOpen ? 'Close navigation' : collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             <Icon name={mobileOpen ? 'x' : 'menu'} size={18} />
           </button>
         </div>
         <div className="sidebar-scroll">
+          {(!collapsed || mobileOpen) && <label className="nav-filter"><Icon name="search" size={16} /><input aria-label="Find a module" placeholder="Find a module…" value={navQuery} onChange={e => setNavQuery(e.target.value)} /></label>}
           <nav>
             {navSections.map((section, si) => {
-              const visible = section.items.filter((n) => canSee(n, user));
+              const visible = section.items.filter((n) => canSee(n, user) && (!navQuery || collapsed || n.label.toLowerCase().includes(navQuery.toLowerCase()) || section.label?.toLowerCase().includes(navQuery.toLowerCase())));
               if (!visible.length) return null;
               return (
-                <div key={si} className="nav-section">
-                  {(!collapsed || mobileOpen) && section.label && <div className="nav-section-label">{section.label}</div>}
+                <details key={`${si}-${navQuery}-${collapsed}-${location.pathname.split('/')[1]}`} className="nav-section" open={!!navQuery || collapsed || !section.label || ['Orders', 'Operations', 'Collections'].includes(section.label) || visible.some(n => location.pathname.startsWith(n.to))}>
+                  <summary hidden={!section.label || (collapsed && !mobileOpen)} className="nav-section-label">{section.label}<Icon name="chevronDown" size={14} /></summary>
                   {visible.map((n) => (
                     <NavLink key={n.to} to={n.to} end={n.end} title={n.label} onClick={onCloseMobile}
                       className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>
@@ -201,7 +231,7 @@ export default function Sidebar({ collapsed, onToggle, mobileOpen, onCloseMobile
                       </NavLink>
                     ))
                   )}
-                </div>
+                </details>
               );
             })}
           </nav>

@@ -335,7 +335,7 @@ export default function ProfilePage() {
                       type="text"
                       className="profile-input"
                       placeholder="e.g. Rajeshwar V. Rao"
-                      value={form.fullName}
+                      aria-label="Full name" value={form.fullName}
                       onChange={(e) => setForm({ ...form, fullName: e.target.value })}
                       required
                     />
@@ -352,7 +352,7 @@ export default function ProfilePage() {
                       type="email"
                       className="profile-input"
                       placeholder="e.g. user@exclusivepoms.com"
-                      value={form.email}
+                      aria-label="Email address" value={form.email}
                       onChange={(e) => setForm({ ...form, email: e.target.value })}
                       required
                     />
@@ -370,7 +370,7 @@ export default function ProfilePage() {
                         type="tel"
                         className="profile-input"
                         placeholder="+91 98765 43210"
-                        value={form.phone}
+                        aria-label="Phone number" value={form.phone}
                         onChange={(e) => setForm({ ...form, phone: e.target.value })}
                       />
                     </div>
@@ -384,7 +384,7 @@ export default function ProfilePage() {
                         type="text"
                         className="profile-input"
                         placeholder="e.g. Purchase Manager"
-                        value={form.designation}
+                        aria-label="Designation" value={form.designation}
                         onChange={(e) => setForm({ ...form, designation: e.target.value })}
                       />
                     </div>

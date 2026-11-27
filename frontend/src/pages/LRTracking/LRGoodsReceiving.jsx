@@ -129,7 +129,7 @@ export default function LRGoodsReceiving() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '24px' }}>
+      <div className="shipment-workspace">
         {/* Left Column: Shipments awaiting receiving */}
         <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '18px', maxHeight: '780px', overflowY: 'auto' }}>
           <h3 style={{ margin: '0 0 14px 0', fontSize: '15px', fontWeight: 700, color: '#1e293b' }}>

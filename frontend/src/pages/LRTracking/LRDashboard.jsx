@@ -33,6 +33,8 @@ export default function LRDashboard() {
     return <DashboardSkeleton />;
   }
 
+  if (error && !data) return <div className="panel"><h2>Shipment data unavailable</h2><p role="alert" className="alert error">{error}</p><button className="btn primary" onClick={fetchDashboard}>Try again</button></div>;
+
   const { overall = {}, locationStats = {}, transporterStats = [], dailyTrends = [] } = data || {};
 
   return (

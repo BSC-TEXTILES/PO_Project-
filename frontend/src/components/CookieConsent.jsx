@@ -19,7 +19,7 @@ export default function CookieConsent() {
   return (
     <div className="cookie-banner" role="dialog" aria-label="Cookie notice">
       <div className="cookie-text">
-        <strong>We use cookies 🍪</strong>
+        <strong>Your workspace preferences</strong>
         <span>
           POMS stores only strictly necessary cookies and local storage: your session token,
           your display preferences (dark/bright mode) and a per-tab identifier for live session
@@ -27,7 +27,7 @@ export default function CookieConsent() {
           <a href="/privacy">Privacy Policy</a> and <a href="/terms">Terms &amp; Conditions</a>.
         </span>
       </div>
-      <button className="btn primary" onClick={accept}>Accept &amp; continue</button>
+      <button className="btn primary" onClick={accept}>Got it</button>
     </div>
   );
 }

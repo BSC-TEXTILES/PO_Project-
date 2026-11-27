@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getTabId } from './utils/tabId.js';
 
 // Cross-origin deployments (Vercel frontend → Render backend) set
 // VITE_API_BASE to e.g. https://poms-api.onrender.com/api ; single-origin
@@ -18,13 +19,14 @@ export const assetUrl = (url) => {
   return `${API_ORIGIN}${url}`;
 };
 
-const api = axios.create({ baseURL: API_BASE });
+const api = axios.create({ baseURL: API_BASE, timeout: 30000 });
 
 // ─── Token integration & Automatic Token Refresh ────────────────────────────
 let _getToken = null;
 export function setTokenGetter(fn) { _getToken = fn; }
 
 api.interceptors.request.use(async (cfg) => {
+  cfg.headers['X-Tab-Id'] = getTabId();
   if (_getToken) {
     try {
       const token = await _getToken();
@@ -58,6 +60,7 @@ api.interceptors.response.use(
       }
 
       if (isRefreshing) {
+        originalRequest._retry = true;
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
         })
@@ -78,7 +81,7 @@ api.interceptors.response.use(
         const { data } = await axios.post(
           `${API_BASE}/auth/refresh`,
           {},
-          { headers: { Authorization: `Bearer ${currentToken}` } }
+          { timeout: 15000, headers: { Authorization: `Bearer ${currentToken}`, 'X-Tab-Id': getTabId() } }
         );
 
         const newToken = data.token;
@@ -114,6 +117,7 @@ export const errMessage = (e) => {
   // Network errors (no response received)
   if (!e.response) {
     const target = API_ORIGIN || (typeof window !== 'undefined' ? window.location.origin : 'the backend server');
+    if (e.code === 'ECONNABORTED') return 'The request took too long. Please try again.';
     if (e.code === 'ERR_NETWORK') {
       return `Backend server is not reachable at ${target}. Please ensure the backend service is running.`;
     }
@@ -140,7 +144,7 @@ export const errMessage = (e) => {
 export const uploadFile = (path, files, field = 'files') => {
   const fd = new FormData();
   for (const f of Array.isArray(files) ? files : [files]) fd.append(field, f);
-  return api.post(path, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+  return api.post(path, fd, { timeout: 120000, headers: { 'Content-Type': 'multipart/form-data' } });
 };
 
 export const formatBytes = (n) => {

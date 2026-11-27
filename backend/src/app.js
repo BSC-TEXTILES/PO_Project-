@@ -111,7 +111,7 @@ app.get('/api/health', async (req, res) => {
   }
 
   res.json({
-    status: 'ok',
+    status: dbStatus === 'error' ? 'degraded' : 'ok',
     service: 'poms-api',
     database: engine,
     dbStatus,
@@ -160,6 +160,7 @@ import { fileURLToPath } from 'node:url';
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const candidateDirs = [
+  path.join(currentDir, '..', '..', 'frontend', 'dist'),
   path.join(currentDir, '..', 'public'),
   path.join(currentDir, '..', 'dist'),
   path.join(currentDir, '..', '..', 'public'),
@@ -180,6 +181,9 @@ for (const dir of candidateDirs) {
   if (fs.existsSync(resolved) && !registeredDirs.has(resolved)) {
     registeredDirs.add(resolved);
     app.use(express.static(resolved));
+    // Use one coherent build; mixing stale bundles from fallback directories
+    // can expose removed code and creates unpredictable deployment behavior.
+    if (fs.existsSync(path.join(resolved, 'index.html'))) break;
   }
 }
 
