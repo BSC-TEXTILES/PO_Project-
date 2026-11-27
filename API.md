@@ -147,3 +147,13 @@
 - **Auth**: Bearer Token (`reports.export`)
 - **Query Params**: `format` (`xlsx`, `pdf`, `csv`), `type` (`po_summary`, `brand_wise`, `lr_shipments`).
 - **Response**: Binary file stream with appropriate `Content-Disposition`.
+
+## Import mapping preview
+
+### POST `/api/import/:id/preview`
+
+- Authentication: Bearer token; requires `masters.manage` or `import.manage`.
+- Body: `{ "mapping": { ... } }`, using the column-to-field mapping from the import review workflow.
+- Requires an existing import in `awaiting_confirmation` status. Re-parses the staged file and returns `{ data: { importId, preview } }` with mapped records and validation results; does not apply product changes.
+- Returns 400 for a missing/invalid mapping or non-reviewable status, and 404 for an unknown import session.
+- Apply changes separately through `POST /api/import/:id/confirm`; confirmation revalidates records and locks the history row transactionally to prevent concurrent duplicate application.

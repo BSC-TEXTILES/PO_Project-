@@ -33,3 +33,10 @@
 2. **Zero-Secret Commits**: Never stage `.env` or credential files to Git.
 3. **No Destructive Drops**: Never drop production database tables without prior export and backward-compatible migration files.
 4. **Parameter Binding**: Never concatenate raw variables into SQL queries; always use `?` placeholders with `db.query()`.
+
+## Import review invariants (27 November 2026)
+
+- Mapping preview does not apply product changes; confirmation remains an explicit separate action.
+- Import execution locks the existing history row and writes product changes, row outcomes and final history status within the transaction. No new schema was introduced by the UI redesign.
+- The isolated frontend review harness uses empty responses and rejects mutations. Never deploy it or treat it as real-record verification.
+- Production readiness remains unverified; see `backend/docs/UI_UX_REDESIGN_REPORT.md` for test scope and remaining blockers.

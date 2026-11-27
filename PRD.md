@@ -95,3 +95,9 @@ BSC Textiles operates large retail outlets and manufacturing fulfillment centers
 | **REQ-REC-002** | `backend/src/routes/receipts.js` | `frontend/src/pages/Receipts.jsx` | `goods_receipt_notes` |
 | **REQ-REP-002** | `backend/src/routes/reports.js` | `frontend/src/components/DateRangeBar.jsx`| `purchase_orders` |
 | **REQ-MST-002** | `backend/src/routes/departments.js` | `frontend/src/components/Sidebar.jsx` | `departments` |
+
+## Import review workflow
+
+- **REQ-IMP-001**: Authorized users can upload supported product files, map columns, review actual parsed rows and validation errors, and explicitly confirm or cancel an import.
+- **REQ-IMP-002**: Mapping changes can be previewed before applying product changes. History and per-row outcomes remain available for review.
+- **REQ-IMP-003**: Concurrent confirmation must not apply the same staged import twice. Live database transaction verification remains required before production sign-off.
